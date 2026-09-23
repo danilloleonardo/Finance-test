@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.0.3</title>
+  <title>Finanças a Dois — V2.0.4</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1685,27 +1685,16 @@ Regras:
   }
   function clearAuthError(){ $("authError").classList.remove("show"); }
 
-  async function performLogin(){
+  $("loginBtn").addEventListener("click", async()=>{
     clearAuthError();
-    const btn=$("loginBtn");
-    const email=$("authEmail").value.trim();
-    const password=$("authPassword").value;
-    if(!email){showAuthError("Digite seu e-mail.");$("authEmail").focus();return;}
-    if(!password){showAuthError("Digite sua senha.");$("authPassword").focus();return;}
-    const oldText=btn.textContent;
-    btn.disabled=true; btn.textContent="Entrando…";
     try{
-      await firebaseAuth.signInWithEmailAndPassword(email,password);
-    }catch(err){
-      console.error("Falha no login:",err);
-      showAuthError(authError(err));
-    }finally{
-      btn.disabled=false; btn.textContent=oldText;
-    }
-  }
-  $("loginBtn").addEventListener("click",performLogin);
-  $("authEmail").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();performLogin();}});
-  $("authPassword").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();performLogin();}});
+      await firebaseAuth.signInWithEmailAndPassword($("authEmail").value.trim(), $("authPassword").value);
+    }catch(err){ showAuthError(authError(err)); }
+  });
+  // V2.0.4: Enter apenas aciona exatamente o mesmo botão/fluxo já validado na produção.
+  ["authEmail","authPassword"].forEach(id=>$(id).addEventListener("keydown",e=>{
+    if(e.key==="Enter"){e.preventDefault();$("loginBtn").click();}
+  }));
 
   $("signupBtn").addEventListener("click", async()=>{
     clearAuthError();
