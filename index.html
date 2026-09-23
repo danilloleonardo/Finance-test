@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V1.7.4</title>
+  <title>Finanças a Dois — V1.9</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -968,7 +968,7 @@
         <div class="ai-assistant-sub">A IA usa seus lançamentos do Firebase para registrar gastos, responder perguntas, comparar meses e encontrar oportunidades de economia.</div>
         <div class="ai-row">
           <input id="aiInput" class="ai-input" type="text" autocomplete="off" placeholder="Ex.: gastei 50 reais de gasolina">
-          <button id="aiMic" class="ai-mic" type="button" title="Segure para falar e solte para enviar">🎙️</button>
+          <button id="aiMic" title="Segure para falar; solte para enviar" class="ai-mic" type="button" title="Segure para falar e solte para enviar">🎙️</button>
           <button id="aiSend" class="btn ai-send" type="button">Perguntar</button>
         </div>
         <div id="aiStatus" class="ai-status"></div>
@@ -1466,7 +1466,11 @@ Regras:
 - Responsáveis válidos: Danillo ou Patricia.
 - Resolva "hoje", "ontem" e datas relativas usando a data atual enviada no prompt.
 - IMPORTANTE: os dados financeiros trazem "selectedMonthTotals" (totais do mês selecionado), "monthlyTotals" (totais já somados de cada mês) e "categoryTotalsSelectedMonth" (soma por categoria no mês selecionado) — esses valores já foram calculados pelo aplicativo e são a fonte da verdade. Para perguntas sobre total gasto/recebido/saldo de um mês ou de uma categoria, USE ESSES TOTAIS PRONTOS e nunca some os itens de "transactions" manualmente, pois isso pode gerar erro de conta. Use a lista "transactions" apenas para listar lançamentos individuais ou detalhes (datas, descrições, canais) que não estejam nos totais prontos.
-- Você pode resumir, comparar meses, encontrar maiores gastos, tendências e oportunidades de economia usando os totais prontos sempre que disponíveis. Quando o usuário pedir uma análise geral, apresente um diagnóstico objetivo com saldo, taxa de economia, principais gastos, comparação com o mês anterior e projeção do mês atual quando houver dados suficientes. Quando o usuário pedir uma análise geral, apresente um diagnóstico objetivo com saldo, taxa de economia, principais gastos, comparação com o mês anterior e projeção do mês atual quando houver dados suficientes.
+- Você pode resumir, comparar meses, encontrar maiores gastos, tendências e oportunidades de economia usando os totais prontos sempre que disponíveis.
+- "budgetStatus" contém orçamento, gasto, disponível e percentual usado por categoria. Use-o para perguntas como "quanto ainda posso gastar em lazer?".
+- Para comparações entre meses, use "monthlyTotals"; deixe claro o valor absoluto e, quando fizer sentido, a variação percentual.
+- Para "onde estou gastando mais?", use "categoryTotalsSelectedMonth" e explique objetivamente as maiores categorias.
+- Quando o usuário pedir uma análise geral, apresente saldo, taxa de economia, principais gastos, comparação com o mês anterior, alertas de orçamento e projeção do mês atual quando houver dados suficientes.
 - Se algo não puder ser concluído com os dados recebidos, diga isso.
 - Nunca diga que salvou um lançamento. O aplicativo só salva após a confirmação do usuário.
         `.trim()
@@ -2920,8 +2924,13 @@ Regras:
       selectedMonthTotals:{income:round2(selectedTotals.income), expense:round2(selectedTotals.expense), balance:round2(selectedTotals.income-selectedTotals.expense)},
       monthlyTotals,
       categoryTotalsSelectedMonth,
+      budgetStatus: categories.map(category=>{
+        const budget=Number(state.budgets?.[category]||0);
+        const spent=Number(catSums[category]||0);
+        return {category,budget:round2(budget),spent:round2(spent),available:round2(budget-spent),usedPct:budget?round2(spent/budget*100):null};
+      }).filter(x=>x.budget>0),
       forecast: cfoBuildForecastForAI(selectedMonth),
-      transactions:state.transactions.map(t=>({
+      transactions:state.transactions.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,250).map(t=>({
         date:t.date||null,
         month:t.month||(t.date?t.date.slice(0,7):null),
         type:t.type,
@@ -2945,8 +2954,10 @@ Regras:
     const date=/^\d{4}-\d{2}-\d{2}$/.test(String(data.date||"")) ? data.date : aiToday(0);
     const category=categories.includes(data.category) ? data.category : aiDetectCategory(originalText);
     const responsible=["Danillo","Patricia"].includes(data.responsible) ? data.responsible : aiDetectResponsible(originalText);
+    const createdAt=Date.now();
     return {
-      id:crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      id:crypto.randomUUID ? crypto.randomUUID() : String(createdAt),
+      createdAt,updatedAt:createdAt,
       type:data.type==="income"?"income":"expense",
       date,
       month:date.slice(0,7),
@@ -3069,65 +3080,115 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
   if(SpeechRecognition){
     aiRecognition=new SpeechRecognition();
     aiRecognition.lang="pt-BR";
-    aiRecognition.interimResults=false;
-    aiRecognition.continuous=false;
+    aiRecognition.interimResults=true;
+    aiRecognition.continuous=true;
+    aiRecognition.maxAlternatives=1;
 
-    // Estado do "segurar para falar" (estilo WhatsApp)
-    let aiHolding=false;      // botão está pressionado
-    let aiHeardSomething=false; // já chegou algum resultado de voz
-    let aiHoldTimer=null;
-    const HOLD_THRESHOLD_MS=250; // toque rápido (< isso) não conta como "segurar"
+    // V1.9 — segurar para falar: acumula frases longas e só processa ao soltar.
+    let aiHolding=false;
+    let aiRecognitionActive=false;
+    let aiFinalTranscript="";
+    let aiInterimTranscript="";
+    let aiShouldProcess=false;
+    let aiRestarting=false;
+
+    const voiceText=()=>[aiFinalTranscript,aiInterimTranscript].filter(Boolean).join(" ").replace(/\s+/g," ").trim();
 
     aiRecognition.onstart=()=>{
+      aiRecognitionActive=true;
+      aiRestarting=false;
       $("aiMic").classList.add("listening");
       $("aiMic").textContent="🔴";
-      $("aiStatus").textContent="Ouvindo… fale agora e solte o botão.";
+      $("aiStatus").textContent="Ouvindo… pode falar à vontade. Solte quando terminar.";
     };
 
     aiRecognition.onresult=e=>{
-      aiHeardSomething=true;
-      const text=e.results?.[0]?.[0]?.transcript||"";
-      $("aiInput").value=text;
-      // Já chegou o texto reconhecido: processa automaticamente, sem esperar clique em "Perguntar"
-      aiProcess(text);
+      let interim="";
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        const part=(e.results[i]?.[0]?.transcript||"").trim();
+        if(!part) continue;
+        if(e.results[i].isFinal) aiFinalTranscript+=(aiFinalTranscript?" ":"")+part;
+        else interim+=(interim?" ":"")+part;
+      }
+      aiInterimTranscript=interim;
+      const full=voiceText();
+      if(full) $("aiInput").value=full;
     };
 
     aiRecognition.onerror=e=>{
-      $("aiStatus").textContent="Não consegui ouvir. Tente novamente ou digite.";
-      console.warn(e);
+      console.warn("Reconhecimento de voz:",e);
+      if(e.error==="no-speech" && aiHolding) return;
+      if(e.error==="aborted" && !aiHolding) return;
+      $("aiStatus").textContent=e.error==="not-allowed"
+        ?"Permissão do microfone bloqueada. Libere o microfone no navegador."
+        :"Não consegui ouvir corretamente. Tente novamente ou digite.";
     };
 
     aiRecognition.onend=()=>{
+      aiRecognitionActive=false;
+      // Alguns navegadores encerram sessões longas sozinhos. Enquanto o botão continuar
+      // pressionado, reiniciamos para não perder o restante da fala.
+      if(aiHolding){
+        try{
+          aiRestarting=true;
+          aiRecognition.start();
+          return;
+        }catch(e){console.warn("Reinício da voz:",e)}
+      }
       $("aiMic").classList.remove("listening");
       $("aiMic").textContent="🎙️";
-      aiHolding=false;
+      if(aiShouldProcess){
+        aiShouldProcess=false;
+        const full=voiceText();
+        aiInterimTranscript="";
+        if(full){
+          $("aiInput").value=full;
+          $("aiStatus").textContent="✓ Áudio transcrito. Interpretando…";
+          aiProcess(full);
+        }else{
+          $("aiStatus").textContent="Não identifiquei nenhuma fala. Tente novamente.";
+        }
+      }
     };
 
-    const startHold=(ev)=>{
-      ev.preventDefault();
-      if(aiHolding) return;
+    const startHold=ev=>{
+      ev?.preventDefault();
+      if(aiHolding)return;
       aiHolding=true;
-      aiHeardSomething=false;
-      try{ aiRecognition.start(); }catch(e){ /* já pode estar rodando */ }
+      aiShouldProcess=false;
+      aiFinalTranscript="";
+      aiInterimTranscript="";
+      $("aiInput").value="";
+      try{aiRecognition.start()}catch(e){console.warn("Início da voz:",e)}
     };
 
-    const endHold=(ev)=>{
-      if(ev) ev.preventDefault();
-      if(!aiHolding) return;
+    const endHold=ev=>{
+      ev?.preventDefault();
+      if(!aiHolding)return;
       aiHolding=false;
-      try{ aiRecognition.stop(); }catch(e){console.warn(e)}
+      aiShouldProcess=true;
+      // stop() preserva o último resultado; abort() poderia descartá-lo.
+      if(aiRecognitionActive){
+        try{aiRecognition.stop()}catch(e){console.warn("Fim da voz:",e)}
+      }else{
+        const full=voiceText();
+        aiShouldProcess=false;
+        if(full){$("aiInput").value=full;aiProcess(full)}
+      }
     };
 
     const micBtn=$("aiMic");
-    // Mouse (desktop)
-    micBtn.addEventListener("mousedown",startHold);
-    document.addEventListener("mouseup",endHold);
-    micBtn.addEventListener("mouseleave",()=>{ if(aiHolding) endHold(); });
-    // Touch (celular)
-    micBtn.addEventListener("touchstart",startHold,{passive:false});
-    micBtn.addEventListener("touchend",endHold,{passive:false});
-    micBtn.addEventListener("touchcancel",endHold,{passive:false});
-    // Evita menu de contexto ao segurar no celular
+    if(window.PointerEvent){
+      micBtn.addEventListener("pointerdown",ev=>{try{micBtn.setPointerCapture(ev.pointerId)}catch(_){} startHold(ev)});
+      micBtn.addEventListener("pointerup",endHold);
+      micBtn.addEventListener("pointercancel",endHold);
+    }else{
+      micBtn.addEventListener("mousedown",startHold);
+      document.addEventListener("mouseup",endHold);
+      micBtn.addEventListener("touchstart",startHold,{passive:false});
+      micBtn.addEventListener("touchend",endHold,{passive:false});
+      micBtn.addEventListener("touchcancel",endHold,{passive:false});
+    }
     micBtn.addEventListener("contextmenu",e=>e.preventDefault());
   }else{
     $("aiMic").disabled=true;
@@ -3156,6 +3217,7 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
 
 
 
+  /* FINANCAS_V18_V19 — IA financeira ampliada + voz longa acumulada */
   /* FINANCAS_V173_TEST_READONLY */
   const TEST_READ_ONLY=true;
   function testReadOnlyNotice(){
