@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.0.7</title>
+  <title>Finanças a Dois — V2.0.8</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -839,11 +839,21 @@
     input:focus,select:focus{border-color:#54c99a!important;box-shadow:0 0 0 3px rgba(84,201,154,.14)!important}
 
     /* V2.0 — importação inteligente */
-    .import-row{display:grid;grid-template-columns:34px 100px 1.25fr 1.1fr 1fr 120px;gap:8px;align-items:center;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
+    .import-row{display:grid;grid-template-columns:32px minmax(125px,.85fr) minmax(220px,1.65fr) minmax(175px,1.25fr) minmax(140px,1fr) minmax(135px,.9fr);gap:14px;align-items:end;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--card)}
     .import-row input,.import-row select{min-width:0;width:100%}
-    .import-original{font-size:10px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .import-badge{font-size:10px;font-weight:800;padding:4px 7px;border-radius:999px;background:var(--green-3);color:var(--navy)}
-    @media(max-width:760px){.import-row{grid-template-columns:30px 1fr 110px}.import-row .wide{grid-column:2/-1}.toolbar .actions{gap:6px}.toolbar .actions .btn{padding:9px 10px}}
+    .import-field{min-width:0}
+    .import-label{display:block;font-size:10px;line-height:1.2;font-weight:800;text-transform:uppercase;letter-spacing:.45px;color:var(--muted);margin:0 0 6px}
+    .import-original{font-size:10px;color:var(--muted);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .import-amount{font-size:15px;font-weight:800;color:var(--text);white-space:nowrap}
+    .import-badge{display:inline-flex;font-size:10px;font-weight:800;padding:4px 7px;border-radius:999px;background:var(--green-3);color:var(--navy)}
+    /* Importação é uma tela de conferência: privacidade global nunca deve apagar seus dados. */
+    .values-hidden #importBackdrop input,
+    .values-hidden #importBackdrop select,
+    .values-hidden #importBackdrop .import-amount,
+    .values-hidden #importBackdrop .import-original{filter:none!important;color:var(--text)!important;text-shadow:none!important;caret-color:auto!important;opacity:1!important}
+    .values-hidden #importBackdrop .import-original{color:var(--muted)!important}
+    @media(max-width:900px){.import-row{grid-template-columns:32px 1fr 1fr}.import-field.merchant{grid-column:2/-1}.import-field.category{grid-column:2}.import-field.responsible{grid-column:3}.import-field.amount{grid-column:2/-1}}
+    @media(max-width:600px){.import-row{grid-template-columns:28px 1fr;gap:10px}.import-field,.import-field.merchant,.import-field.category,.import-field.responsible,.import-field.amount{grid-column:2}.toolbar .actions{gap:6px}.toolbar .actions .btn{padding:9px 10px}}
 </style>
 </head>
 
@@ -1224,7 +1234,7 @@
 </div>
 
 <div id="importBackdrop" class="modal-backdrop">
-  <div class="modal" style="max-width:980px">
+  <div class="modal" style="max-width:1120px">
     <div class="modal-head">
       <div><h3>Importação inteligente</h3><div style="font-size:12px;color:var(--muted);margin-top:3px">Confira o que foi identificado antes de importar.</div></div>
       <button class="close" type="button" onclick="closeSmartImport()">✕</button>
@@ -2682,13 +2692,13 @@ Regras:
   function renderSmartImport(){
     const box=$("importPreview");
     if(!smartImportRows.length){box.innerHTML='<div class="empty">Nenhuma transação identificada.</div>';return;}
-    box.innerHTML=smartImportRows.map((r,i)=>`<div class="import-row">
-      <input type="checkbox" class="import-check" data-i="${i}" ${r.duplicate?"":"checked"}>
-      <input type="date" class="import-date" data-i="${i}" value="${esc(r.date)}">
-      <div class="wide"><input class="import-merchant" data-i="${i}" value="${esc(r.merchant)}"><div class="import-original">Original: ${esc(r.original)}</div></div>
-      <div class="wide"><select class="import-category" data-i="${i}">${categories.map(x=>`<option ${x===r.category?"selected":""}>${esc(x)}</option>`).join("")}</select></div>
-      <div class="wide"><select class="import-resp" data-i="${i}"><option>Danillo</option><option>Patricia</option></select></div>
-      <div><strong>${money(r.amount)}</strong><div style="margin-top:4px">${r.duplicate?'<span class="import-badge">Possível duplicado</span>':'<span class="import-badge">Novo</span>'}</div></div>
+    box.innerHTML=smartImportRows.map((r,i)=>`<div class="import-row entry-confirmation">
+      <input type="checkbox" class="import-check" data-i="${i}" ${r.duplicate?"":"checked"} aria-label="Selecionar transação">
+      <div class="import-field date"><label class="import-label">Data</label><input type="date" class="import-date privacy-entry-visible" data-i="${i}" value="${esc(r.date)}"></div>
+      <div class="import-field merchant"><label class="import-label">Estabelecimento</label><input class="import-merchant privacy-entry-visible" data-i="${i}" value="${esc(r.merchant)}"><div class="import-original">Original: ${esc(r.original)}</div></div>
+      <div class="import-field category"><label class="import-label">Categoria</label><select class="import-category privacy-entry-visible" data-i="${i}">${categories.map(x=>`<option ${x===r.category?"selected":""}>${esc(x)}</option>`).join("")}</select></div>
+      <div class="import-field responsible"><label class="import-label">Responsável</label><select class="import-resp privacy-entry-visible" data-i="${i}"><option>Danillo</option><option>Patricia</option></select></div>
+      <div class="import-field amount"><label class="import-label">Valor</label><div class="import-amount privacy-entry-visible">${money(r.amount)}</div><div style="margin-top:6px">${r.duplicate?'<span class="import-badge">Possível duplicado</span>':'<span class="import-badge">Novo</span>'}</div></div>
     </div>`).join("");
     $("importConfirmBtn").disabled=TEST_READ_ONLY;
     $("importConfirmBtn").title=TEST_READ_ONLY?"Ambiente de teste: somente leitura":"";
