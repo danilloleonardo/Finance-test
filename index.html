@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V1.7.3</title>
+  <title>Finanças a Dois — V1.7.4</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -342,8 +342,8 @@
     .month-chip.active{background:var(--navy-800);border-color:var(--navy-800);color:#fff}
     .filter-panel{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:9px;margin-bottom:13px}
     .filter-panel input,.filter-panel select{min-width:0}
-    .privacy-value{transition:filter .18s ease}
-    .values-hidden .privacy-value{filter:blur(10px);user-select:none;pointer-events:none}
+    .privacy-money{transition:filter .18s ease}
+    .values-hidden .privacy-money{filter:blur(10px);user-select:none;pointer-events:none}
     /* Também protege valores que estejam em campos de formulários enquanto a privacidade estiver ativa. */
     .values-hidden input[type="number"]:not(.privacy-entry-visible),
     .values-hidden input[data-private-value]:not(.privacy-entry-visible){
@@ -353,7 +353,7 @@
     }
     /* V1.4: valores em fluxos de conferência/lançamento precisam permanecer legíveis. */
     .values-hidden .privacy-entry-visible,
-    .values-hidden .entry-confirmation .privacy-value{
+    .values-hidden .entry-confirmation .privacy-money{
       filter:none!important;
       color:inherit!important;
       text-shadow:none!important;
@@ -1066,7 +1066,7 @@
         </div>
         <div class="card metric">
           <div class="metric-label">Taxa de economia</div>
-          <div id="mRate" class="metric-value privacy-value">0%</div>
+          <div id="mRate" class="metric-value">0%</div>
           <div class="metric-sub">Quanto ficou no mês</div>
         </div>
       </div>
@@ -2530,7 +2530,7 @@ Regras:
   */
   function markPrivacyValues(root=document.body){
     if(!root) return;
-    const moneyRe=/R\\$\\s*-?\\s*[\\d.]+(?:,\\d{1,2})?/gi;
+    const moneyRe=/R\$\s*-?\s*[\d.]+(?:,\d{1,2})?/gi;
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     const nodes=[];
     while(walker.nextNode()) nodes.push(walker.currentNode);
