@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.0.2</title>
+  <title>Finanças a Dois — V2.0.3</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1685,12 +1685,27 @@ Regras:
   }
   function clearAuthError(){ $("authError").classList.remove("show"); }
 
-  $("loginBtn").addEventListener("click", async()=>{
+  async function performLogin(){
     clearAuthError();
+    const btn=$("loginBtn");
+    const email=$("authEmail").value.trim();
+    const password=$("authPassword").value;
+    if(!email){showAuthError("Digite seu e-mail.");$("authEmail").focus();return;}
+    if(!password){showAuthError("Digite sua senha.");$("authPassword").focus();return;}
+    const oldText=btn.textContent;
+    btn.disabled=true; btn.textContent="Entrando…";
     try{
-      await firebaseAuth.signInWithEmailAndPassword($("authEmail").value.trim(), $("authPassword").value);
-    }catch(err){ showAuthError(authError(err)); }
-  });
+      await firebaseAuth.signInWithEmailAndPassword(email,password);
+    }catch(err){
+      console.error("Falha no login:",err);
+      showAuthError(authError(err));
+    }finally{
+      btn.disabled=false; btn.textContent=oldText;
+    }
+  }
+  $("loginBtn").addEventListener("click",performLogin);
+  $("authEmail").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();performLogin();}});
+  $("authPassword").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();performLogin();}});
 
   $("signupBtn").addEventListener("click", async()=>{
     clearAuthError();
