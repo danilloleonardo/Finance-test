@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois</title>
+  <title>Finanças a Dois — V1.4</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -345,12 +345,27 @@
     .privacy-value{transition:filter .18s ease}
     .values-hidden .privacy-value{filter:blur(10px);user-select:none;pointer-events:none}
     /* Também protege valores que estejam em campos de formulários enquanto a privacidade estiver ativa. */
-    .values-hidden input[type="number"],
-    .values-hidden input[data-private-value]{
+    .values-hidden input[type="number"]:not(.privacy-entry-visible),
+    .values-hidden input[data-private-value]:not(.privacy-entry-visible){
       color:transparent!important;
       text-shadow:0 0 10px var(--text);
       caret-color:transparent;
     }
+    /* V1.4: valores em fluxos de conferência/lançamento precisam permanecer legíveis. */
+    .values-hidden .privacy-entry-visible,
+    .values-hidden .entry-confirmation .privacy-value{
+      filter:none!important;
+      color:inherit!important;
+      text-shadow:none!important;
+      user-select:auto!important;
+      pointer-events:auto!important;
+      caret-color:auto!important;
+    }
+    .transaction-feedback{display:none;margin:12px 0 0;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.45}
+    .transaction-feedback.error{display:block;background:var(--red-bg);color:var(--red);border:1px solid rgba(201,75,75,.22)}
+    .transaction-feedback.info{display:block;background:var(--green-3);color:var(--navy);border:1px solid rgba(4,52,76,.12)}
+    .installment-summary{display:none;margin-top:9px;padding:10px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.45}
+    .installment-summary strong{color:var(--text)}
     .group-title{display:flex;align-items:center;justify-content:space-between;padding:15px 0 8px;font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.5px}
     .recent-item{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
     .recent-item:last-child{border-bottom:0}
@@ -958,7 +973,7 @@
         </div>
         <div id="aiStatus" class="ai-status"></div>
         <div id="aiAnswer" class="ai-answer"></div>
-        <div id="aiPreview" class="ai-preview">
+        <div id="aiPreview" class="ai-preview entry-confirmation">
           <strong>Confira o lançamento</strong>
           <div id="aiPreviewText" style="font-size:12px;color:var(--muted);margin-top:3px"></div>
           <div class="ai-preview-grid">
@@ -1203,7 +1218,7 @@
       <h3 id="modalTitle">Novo lançamento</h3>
       <button class="close" onclick="closeModal()">✕</button>
     </div>
-    <form id="transactionForm">
+    <form id="transactionForm" class="entry-confirmation" novalidate>
       <div class="ocr-box" id="ocrBox">
         <label style="display:block;margin-bottom:7px">Lançamento por print</label>
         <label class="ocr-drop" for="receiptImage" id="ocrDrop">📷 Toque aqui para escolher um print ou foto do comprovante<br><span style="font-size:11px">O sistema tenta identificar data, valor e descrição. Confira os campos antes de salvar.</span></label>
@@ -1238,7 +1253,7 @@
         </div>
         <div class="field">
           <label>Valor</label>
-          <input id="tAmount" type="number" min="0.01" step="0.01" placeholder="0,00" required>
+          <input id="tAmount" class="privacy-entry-visible" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0,00" required aria-describedby="transactionFeedback installmentSummary">
         </div>
         <div class="field">
           <label>Canal / estabelecimento</label>
@@ -1270,13 +1285,15 @@
             <option value="36">36x</option>
             <option value="custom">Outro (digitar)</option>
           </select>
-          <input id="tInstallmentsCustom" type="number" min="2" step="1" placeholder="Quantidade de parcelas" style="display:none;margin-top:8px">
+          <input id="tInstallmentsCustom" type="number" min="2" max="120" step="1" inputmode="numeric" placeholder="Quantidade de parcelas" style="display:none;margin-top:8px">
+          <div id="installmentSummary" class="installment-summary privacy-entry-visible"></div>
         </div>
         <div class="field full">
           <label>Detalhes (opcional)</label>
           <input id="tDetails" placeholder="Observação do lançamento">
         </div>
       </div>
+      <div id="transactionFeedback" class="transaction-feedback" role="status" aria-live="polite"></div>
       <div class="form-actions">
         <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
         <button type="submit" id="modalSubmitBtn" class="btn btn-primary">Salvar lançamento</button>
@@ -2168,6 +2185,65 @@ Regras:
     return editingTransactionId ? state.transactions.find(t=>t.id===editingTransactionId) : null;
   }
 
+  function clearTransactionFeedback(){
+    const el=$("transactionFeedback");
+    if(!el) return;
+    el.className="transaction-feedback";
+    el.textContent="";
+  }
+
+  function showTransactionFeedback(message,type="error"){
+    const el=$("transactionFeedback");
+    if(!el) return;
+    el.className=`transaction-feedback ${type}`;
+    el.textContent=message;
+  }
+
+  function getInstallmentCount(){
+    if(!$("tCreditCard").checked || $("tType").value!=="expense") return 1;
+    if($("tInstallmentsSelect").value==="custom") return parseInt($("tInstallmentsCustom").value,10)||0;
+    return parseInt($("tInstallmentsSelect").value,10)||1;
+  }
+
+  function updateInstallmentSummary(){
+    const box=$("installmentSummary");
+    if(!box) return;
+    const editingTx=getEditingTx();
+    const alreadySplit=!!(editingTx && (editingTx.installmentTotal||1)>1);
+    const isCard=$("tType").value==="expense" && $("tCreditCard").checked;
+    if(!isCard || alreadySplit){ box.style.display="none"; box.innerHTML=""; return; }
+    const amount=Number($("tAmount").value)||0;
+    const count=getInstallmentCount();
+    if(!amount || count<1){ box.style.display="none"; box.innerHTML=""; return; }
+    const parts=splitInstallments(amount,count);
+    const first=parts[0]||amount;
+    const last=parts[parts.length-1]||first;
+    box.style.display="block";
+    box.innerHTML=count>1
+      ? `<strong>${count}x no cartão</strong> · total ${money(amount)} · parcelas de ${money(first)}${Math.abs(last-first)>0.001?` (última ${money(last)})`:""}. Cada parcela entra no mês da sua competência.`
+      : `<strong>Compra no cartão à vista</strong> · ${money(amount)}. O pagamento da fatura continua separado da despesa para evitar dupla contabilização.`;
+  }
+
+  function validateTransactionForm(){
+    clearTransactionFeedback();
+    const type=$("tType").value;
+    const date=$("tDate").value;
+    const description=$("tDescription").value.trim();
+    const amount=Number($("tAmount").value);
+    const category=$("tCategory").value;
+    if(!date){ showTransactionFeedback("Informe a data do lançamento."); $("tDate").focus(); return false; }
+    if(!description){ showTransactionFeedback("Informe uma descrição para o lançamento."); $("tDescription").focus(); return false; }
+    if(!category){ showTransactionFeedback("Selecione uma categoria."); $("tCategory").focus(); return false; }
+    if(!Number.isFinite(amount) || amount<=0){ showTransactionFeedback("Informe um valor maior que zero."); $("tAmount").focus(); return false; }
+    if(type!=="expense" && $("tCreditCard").checked){ showTransactionFeedback("Cartão de crédito e parcelamento são aplicados apenas a despesas."); return false; }
+    if(type==="expense" && $("tCreditCard").checked){
+      const count=getInstallmentCount();
+      if(!Number.isInteger(count) || count<1 || count>120){ showTransactionFeedback("Informe uma quantidade válida de parcelas entre 1 e 120."); $("tInstallmentsCustom").focus(); return false; }
+      if($("tInstallmentsSelect").value==="custom" && count<2){ showTransactionFeedback("Para parcelamento personalizado, informe pelo menos 2 parcelas."); $("tInstallmentsCustom").focus(); return false; }
+    }
+    return true;
+  }
+
   function updateCcVisibility(){
     const type = $("tType").value;
     const editingTx = getEditingTx();
@@ -2193,6 +2269,7 @@ Regras:
       $("tCreditCardLabel").textContent = "Cartão de crédito";
       $("tInstallmentsWrap").classList.toggle("hidden", !$("tCreditCard").checked);
     }
+    updateInstallmentSummary();
   }
 
   function openModal(id){
@@ -2202,6 +2279,12 @@ Regras:
     $("modalTitle").textContent = tx ? "Editar lançamento" : "Novo lançamento";
     $("modalSubmitBtn").textContent = tx ? "Salvar alterações" : "Salvar lançamento";
     $("ocrBox").style.display = tx ? "none" : "";
+    clearTransactionFeedback();
+    if(!tx){
+      $("ocrStatus").textContent="";
+      $("ocrPreview").style.display="none";
+      $("receiptImage").value="";
+    }
     populateTransactionCategories();
 
     const total = tx ? (tx.installmentTotal||1) : 1;
@@ -2260,16 +2343,18 @@ Regras:
   window.openGoalModal=openGoalModal; window.closeGoalModal=closeGoalModal;
   window.openWealthModal=openWealthModal; window.closeWealthModal=closeWealthModal;
 
-  $("tType").addEventListener("change",updateCcVisibility);
-  $("tCreditCard").addEventListener("change",updateCcVisibility);
+  $("tType").addEventListener("change",()=>{clearTransactionFeedback();updateCcVisibility();});
+  $("tCreditCard").addEventListener("change",()=>{clearTransactionFeedback();updateCcVisibility();});
   $("tInstallmentsSelect").addEventListener("change",()=>{
     $("tInstallmentsCustom").style.display = $("tInstallmentsSelect").value==="custom" ? "" : "none";
+    clearTransactionFeedback(); updateInstallmentSummary();
   });
+  ["tAmount","tInstallmentsCustom","tDate","tDescription","tCategory"].forEach(id=>$(id)?.addEventListener("input",()=>{clearTransactionFeedback();updateInstallmentSummary();}));
 
   $("transactionForm").addEventListener("submit",async e=>{
     e.preventDefault();
+    if(!validateTransactionForm()) return;
     const amount=Number($("tAmount").value);
-    if(!amount || amount<=0) return;
     const isEditing=!!editingTransactionId;
     const baseType=$("tType").value;
     const editingTx = getEditingTx();
@@ -2280,7 +2365,7 @@ Regras:
     let installmentCount=1;
     if(isCardExpense){
       installmentCount = $("tInstallmentsSelect").value==="custom"
-        ? Math.max(2, parseInt($("tInstallmentsCustom").value,10)||1)
+        ? Math.min(120, Math.max(2, parseInt($("tInstallmentsCustom").value,10)||2))
         : parseInt($("tInstallmentsSelect").value,10)||1;
     }
 
@@ -2429,6 +2514,7 @@ Regras:
       const parent=node.parentElement;
       if(!parent || !moneyOrPercent.test(node.nodeValue||"")) return;
       if(parent.closest("script,style,noscript,textarea,select,option")) return;
+      if(parent.closest(".entry-confirmation")) return;
       parent.classList.add("privacy-value");
     });
   }
@@ -2485,6 +2571,9 @@ Regras:
       const hints={"Mercado":/mercado(?! livre)|hortifruti|hortifruit|sacol[aã]o|atacad[aã]o|sams club|andorinha|assa[ií]|carrefour/,"Almoço-Trabalho":/almoço.*trabalho|almoco.*trabalho|refei[cç][aã]o.*trabalho|almo[cç]o.*expediente/,"Alimentação":/ifood|restaurante|padaria|alimenta|lanche|almoço|jantar/,"Saúde":/hospital|cl[ií]nica|sa[uú]de|amil|consulta|vacina|dentista/,"Farmácia":/farm[aá]cia|drogaria|rem[eé]dio|medicamento/,"Transporte":/uber|99|gasolina|posto|estacionamento|combust[ií]vel|moto|carro/,"Moradia":/aluguel|condom[ií]nio|energia|luz|[áa]gua|g[aá]s/,"Compras":/shopee|mercado livre|amazon|compra|eletrodom[eé]stico/,"Vestuário":/riachuelo|shein|c&a|roupa|cal[çc]a|camisa|vestido|sapato|t[êe]nis/,"Lazer":/cinema|viagem|bar|festival|restaurante/,"Cuidados pessoais":/barbeiro|cabeleireiro|sal[aã]o|est[eé]tica/,"Educação":/escola|faculdade|curso|mensalidade|matr[ií]cula|universidade|col[eé]gio/,"Financiamento e parcelas":/financiamento|cons[oó]rcio|parcela/,"Dízimo/Doações":/d[ií]zimo|oferta|doa[çc][aã]o|igreja/,"Impostos e Documentos":/imposto|ipva|iptu|taxa|cart[oó]rio|documento|darf/,"Transferências":/\bpix\b|\bted\b|\bdoc\b|transfer[eê]ncia/};
       const cat=["Mercado",...cats].find(c=>hints[c]?.test(lower)); if(cat)$("tCategory").value=cat;
       $("tType").value="expense";
+      clearTransactionFeedback();
+      updateCcVisibility();
+      updateInstallmentSummary();
       status.textContent="Leitura concluída. Confira data, descrição, categoria e valor antes de salvar.";
     }catch(err){console.error(err);status.textContent="Não consegui ler o print automaticamente. Preencha os campos manualmente.";}
   });
@@ -2679,6 +2768,10 @@ Regras:
   async function aiConfirmTransaction(){
     if(!aiPendingTransaction)return;
     const tx=aiPendingTransaction;
+    if(!tx.date || !tx.description || !tx.category || !Number.isFinite(Number(tx.amount)) || Number(tx.amount)<=0){
+      $("aiStatus").textContent="Revise o lançamento: data, descrição, categoria e valor precisam estar preenchidos corretamente.";
+      return;
+    }
     state.transactions.push(tx);
     save();
     aiClearPreview();
