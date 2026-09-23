@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V1.7.2</title>
+  <title>Finanças a Dois — V1.7.3</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1992,13 +1992,14 @@ Regras:
       const from=$( "fromDate")?.value||""; const to=$( "toDate")?.value||"";
       if(from) tx=tx.filter(t=>t.date && t.date>=from); if(to) tx=tx.filter(t=>t.date && t.date<=to);
     }
-    // Mais recente primeiro. Em lançamentos do mesmo dia, o último cadastrado/editado fica no topo.
+    // Mais recente primeiro. A data do lançamento é a prioridade; no mesmo dia,
+    // o horário de criação fica apenas interno e serve como desempate.
     return tx.sort((a,b)=>{
       const byDate=String(b.date||"").localeCompare(String(a.date||""));
       if(byDate) return byDate;
-      const aOrder=Number(a.createdAt||a.updatedAt||0), bOrder=Number(b.createdAt||b.updatedAt||0);
-      if(aOrder!==bOrder) return bOrder-aOrder;
-      // Compatibilidade com lançamentos antigos sem timestamp: mantém os mais novos no array primeiro.
+      const aCreated=Number(a.createdAt||0), bCreated=Number(b.createdAt||0);
+      if(aCreated!==bCreated) return bCreated-aCreated;
+      // Legado: como novos lançamentos são adicionados ao fim do array, maior índice = mais recente.
       return state.transactions.indexOf(b)-state.transactions.indexOf(a);
     });
   }
@@ -2529,16 +2530,30 @@ Regras:
   */
   function markPrivacyValues(root=document.body){
     if(!root) return;
-    const moneyOrPercent=/(?:R\$\s*-?\s*[\d.]+(?:,\d{1,2})?|[-+]?\s*[\d.]+(?:,\d{1,2})?\s*%)/i;
+    const moneyRe=/R\\$\\s*-?\\s*[\\d.]+(?:,\\d{1,2})?/gi;
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     const nodes=[];
     while(walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach(node=>{
       const parent=node.parentElement;
-      if(!parent || !moneyOrPercent.test(node.nodeValue||"")) return;
-      if(parent.closest("script,style,noscript,textarea,select,option")) return;
+      if(!parent || parent.closest("script,style,noscript,textarea,select,option,.privacy-money")) return;
       if(parent.closest(".entry-confirmation")) return;
-      parent.classList.add("privacy-value");
+      const text=node.nodeValue||"";
+      moneyRe.lastIndex=0;
+      if(!moneyRe.test(text)) return;
+      moneyRe.lastIndex=0;
+      const frag=document.createDocumentFragment();
+      let last=0,match;
+      while((match=moneyRe.exec(text))){
+        if(match.index>last) frag.appendChild(document.createTextNode(text.slice(last,match.index)));
+        const span=document.createElement("span");
+        span.className="privacy-money privacy-value";
+        span.textContent=match[0];
+        frag.appendChild(span);
+        last=match.index+match[0].length;
+      }
+      if(last<text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      node.replaceWith(frag);
     });
   }
 
@@ -2759,8 +2774,10 @@ Regras:
       /shopee/.test(lower) ? "Shopee" :
       /mercado livre/.test(lower) ? "Mercado Livre" :
       /gasolina|posto/.test(lower) ? "Posto" : "";
+    const createdAt=Date.now();
     return {
-      id:crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      id:crypto.randomUUID ? crypto.randomUUID() : String(createdAt),
+      createdAt,updatedAt:createdAt,
       type,date,month:date.slice(0,7),
       description:aiDescription(text),
       category,amount,responsible,channel,
@@ -3138,6 +3155,46 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
 
 
 
+
+  /* FINANCAS_V173_TEST_READONLY */
+  const TEST_READ_ONLY=true;
+  function testReadOnlyNotice(){
+    toast("Ambiente de teste: somente leitura. Faça alterações na produção.");
+  }
+  const __cloudSaveTransaction=saveTransactionCloud;
+  const __cloudDeleteTransaction=deleteTransactionCloud;
+  const __cloudSaveState=saveCloudState;
+  saveTransactionCloud=async function(tx){ if(TEST_READ_ONLY){testReadOnlyNotice();return false;} return __cloudSaveTransaction(tx); };
+  deleteTransactionCloud=async function(id){ if(TEST_READ_ONLY){testReadOnlyNotice();return false;} return __cloudDeleteTransaction(id); };
+  saveCloudState=async function(){ if(TEST_READ_ONLY) return false; return __cloudSaveState(); };
+
+  // Bloqueia formulários que alterariam dados compartilhados.
+  ["transactionForm","budgetForm","goalForm","wealthForm"].forEach(id=>{
+    const form=document.getElementById(id);
+    if(!form)return;
+    form.addEventListener("submit",e=>{
+      if(!TEST_READ_ONLY)return;
+      e.preventDefault();e.stopImmediatePropagation();testReadOnlyNotice();
+    },true);
+  });
+  // Exclusões também ficam bloqueadas no teste.
+  const __deleteTransaction=window.deleteTransaction;
+  const __deleteGoal=window.deleteGoal;
+  const __deleteWealth=window.deleteWealth;
+  window.deleteTransaction=async id=>TEST_READ_ONLY?testReadOnlyNotice():__deleteTransaction(id);
+  window.deleteGoal=id=>TEST_READ_ONLY?testReadOnlyNotice():__deleteGoal(id);
+  window.deleteWealth=id=>TEST_READ_ONLY?testReadOnlyNotice():__deleteWealth(id);
+
+  // Assistente continua disponível para consultas, mas não confirma lançamentos no teste.
+  const __aiConfirmTransaction=aiConfirmTransaction;
+  aiConfirmTransaction=async function(){ if(TEST_READ_ONLY){testReadOnlyNotice();return;} return __aiConfirmTransaction(); };
+
+  // Identificação discreta e permanente do ambiente seguro.
+  setTimeout(()=>{
+    const status=document.getElementById("firebaseStatus");
+    if(status){status.textContent="TESTE · somente leitura · dados sincronizados da produção";status.style.display="block";}
+  },2200);
+  /* /FINANCAS_V173_TEST_READONLY */
 
   /* FINANCAS_V171_CORRECTIONS */
   const V171Cards={
