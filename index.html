@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V1.7</title>
+  <title>Finanças a Dois — V1.7.1</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1540,6 +1540,7 @@ Regras:
         budgets: state.budgets || {},
         goals: state.goals || [],
         wealth: state.wealth || [],
+        cards: state.cards || [],
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, {merge:true});
     }catch(err){
@@ -1593,6 +1594,7 @@ Regras:
           budgets: state.budgets,
           goals: state.goals,
           wealth: state.wealth,
+          cards: state.cards || [],
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, {merge:true});
       }else{
@@ -1601,7 +1603,9 @@ Regras:
         state.budgets = settings.budgets || {};
         state.goals = settings.goals || [];
         state.wealth = settings.wealth || [];
+        state.cards = settings.cards || state.cards || [];
       }
+      state.cards = state.cards || [];
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       cloudReady = true;
@@ -2136,7 +2140,8 @@ Regras:
   }
 
   function creditCardTransactionsForMonth(ym){
-    return state.transactions.filter(t=>t.isCreditCard && t.type==="expense" && (t.month || (t.date?t.date.slice(0,7):"")) === ym);
+    const cardId = document.getElementById("ccCardSelect")?.value || "";
+    return state.transactions.filter(t=>t.isCreditCard && t.type==="expense" && (t.invoiceMonth || t.month || (t.date?t.date.slice(0,7):"")) === ym && (!cardId || t.cardId===cardId));
   }
 
   function renderCreditCard(){
@@ -2156,7 +2161,7 @@ Regras:
       $("ccPurchaseList").innerHTML = purchases.map(t=>`<div class="cc-purchase-item">
         <div>
           <div class="cc-purchase-desc">${esc(t.description||"Sem descrição")}</div>
-          <div class="cc-purchase-meta">${esc(t.channel||"—")} · ${esc(t.category||"—")} · ${formatDate(t.purchaseDate||t.date)}</div>
+          <div class="cc-purchase-meta">${t.cardName?esc(t.cardName)+" · ":""}${esc(t.channel||"—")} · ${esc(t.category||"—")} · ${formatDate(t.purchaseDate||t.date)}</div>
         </div>
         <div class="cc-purchase-right">
           <div class="cc-purchase-amount privacy-value">${money(t.amount)}</div>
@@ -2369,13 +2374,16 @@ Regras:
         : parseInt($("tInstallmentsSelect").value,10)||1;
     }
 
+    const selectedCard = (baseType==="expense" && $("tCreditCard").checked && window.V171Cards) ? window.V171Cards.ensureCardFromForm() : null;
+    if(baseType==="expense" && $("tCreditCard").checked && !selectedCard){ showTransactionFeedback("Informe o cartão, fechamento e vencimento."); return; }
     const common={
       type:baseType,
       description:$("tDescription").value.trim(),
       category:$("tCategory").value,
       responsible:$("tResponsible").value,
       channel:$("tChannel").value.trim(),
-      details:$("tDetails").value.trim()
+      details:$("tDetails").value.trim(),
+      ...(selectedCard ? {cardId:selectedCard.id, cardName:selectedCard.name} : {})
     };
     const purchaseDate=$("tDate").value;
 
@@ -2400,7 +2408,8 @@ Regras:
           installmentTotal:installmentCount,
           originalPurchaseId,
           purchaseDate,
-          purchaseAmount:amount
+          purchaseAmount:amount,
+          invoiceMonth: window.V171Cards ? window.V171Cards.invoiceMonthForDate(d, selectedCard) : d.slice(0,7)
         };
       });
       if(isEditing) removedId = editingTransactionId; /* estava editando um lançamento simples que virou série de parcelas */
@@ -2422,13 +2431,16 @@ Regras:
           installmentTotal:editingTx.installmentTotal,
           originalPurchaseId:editingTx.originalPurchaseId,
           purchaseDate:editingTx.purchaseDate,
-          purchaseAmount:editingTx.purchaseAmount
+          purchaseAmount:editingTx.purchaseAmount,
+          cardId:editingTx.cardId, cardName:editingTx.cardName, invoiceMonth:editingTx.invoiceMonth
         });
       } else if(isCardExpense){
         Object.assign(tx,{
           paymentMethod:"credit_card", isCreditCard:true,
           installments:1, installmentNumber:1, installmentTotal:1,
-          originalPurchaseId: tx.id, purchaseDate, purchaseAmount:amount
+          originalPurchaseId: tx.id, purchaseDate, purchaseAmount:amount,
+          cardId:selectedCard?.id||null, cardName:selectedCard?.name||"",
+          invoiceMonth: window.V171Cards ? window.V171Cards.invoiceMonthForDate(purchaseDate, selectedCard) : purchaseDate.slice(0,7)
         });
       }
       newTxs=[tx];
@@ -2594,13 +2606,12 @@ Regras:
   });
 
   window.deleteTransaction=async id=>{
-    if(!confirm("Excluir este lançamento?")) return;
-    state.transactions=state.transactions.filter(t=>t.id!==id);
-    save();
-    if(currentUser && cloudReady){
-      try{ await deleteTransactionCloud(id); toast("Lançamento excluído."); }
-      catch(err){ console.error(err); toast("Excluído localmente, mas houve erro na nuvem."); }
-    }else toast("Lançamento excluído.");
+    const target=state.transactions.find(t=>t.id===id), seriesId=target?.originalPurchaseId;
+    const ids=(target?.isCreditCard && Number(target?.installmentTotal)>1 && seriesId)?state.transactions.filter(t=>t.originalPurchaseId===seriesId).map(t=>t.id):[id];
+    if(!confirm(ids.length>1?`Excluir esta compra parcelada e todas as ${ids.length} parcelas vinculadas?`:"Excluir este lançamento?")) return;
+    state.transactions=state.transactions.filter(t=>!ids.includes(t.id)); save();
+    if(currentUser && cloudReady){try{for(const txId of ids) await deleteTransactionCloud(txId);toast(ids.length>1?"Compra parcelada e parcelas excluídas.":"Lançamento excluído.");}catch(err){console.error(err);toast("Excluído localmente, mas houve erro na nuvem.");}}
+    else toast(ids.length>1?"Compra parcelada e parcelas excluídas.":"Lançamento excluído.");
   };
   window.deleteGoal=id=>{
     if(!confirm("Excluir esta meta?")) return;
@@ -3115,6 +3126,24 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
   $("sideLogoutQuick")?.addEventListener("click",()=>$("logoutBtn")?.click());
 
 
+
+
+  /* FINANCAS_V171_CORRECTIONS */
+  const V171Cards={
+    cards(){state.cards=state.cards||[];return state.cards;},
+    invoiceMonthForDate(dateStr,card){const d=new Date(dateStr+"T12:00:00");if(!card||Number.isNaN(d.getTime()))return String(dateStr||"").slice(0,7);const closing=Math.max(1,Math.min(31,Number(card.closingDay)||31));const x=new Date(d.getFullYear(),d.getMonth()+(d.getDate()>closing?1:0),1);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}`;},
+    ensureCardFromForm(){const name=(document.getElementById("tCardName")?.value||"").trim(),closing=Number(document.getElementById("tCardClosing")?.value),due=Number(document.getElementById("tCardDue")?.value);if(!name||closing<1||closing>31||due<1||due>31)return null;let card=this.cards().find(x=>x.name.toLowerCase()===name.toLowerCase());if(!card){card={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,closingDay:closing,dueDay:due};this.cards().push(card);}else{card.name=name;card.closingDay=closing;card.dueDay=due;}this.refreshDatalist();return card;},
+    refreshDatalist(){const dl=document.getElementById("cardNames");if(dl)dl.innerHTML=this.cards().map(x=>`<option value="${esc(x.name)}"></option>`).join("");const sel=document.getElementById("ccCardSelect");if(sel){const old=sel.value;sel.innerHTML='<option value="">Todos os cartões</option>'+this.cards().map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("");if([...sel.options].some(o=>o.value===old))sel.value=old;}},
+    fillCardFields(name){const card=this.cards().find(x=>x.name.toLowerCase()===String(name||"").trim().toLowerCase());if(card){document.getElementById("tCardClosing").value=card.closingDay||"";document.getElementById("tCardDue").value=card.dueDay||"";}},
+    addForm(){if(document.getElementById("tCardFields"))return;const wrap=document.getElementById("tInstallmentsWrap");if(!wrap)return;const d=document.createElement("div");d.id="tCardFields";d.className="field full hidden";d.innerHTML='<label>Qual cartão?</label><input id="tCardName" list="cardNames" placeholder="Ex.: Cartão C6 PF"><datalist id="cardNames"></datalist><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:9px"><div><label>Fechamento</label><input id="tCardClosing" type="number" min="1" max="31" placeholder="Dia"></div><div><label>Vencimento</label><input id="tCardDue" type="number" min="1" max="31" placeholder="Dia"></div></div><small style="display:block;color:var(--muted);margin-top:7px">Cartões novos são gravados automaticamente. Fechamento e vencimento continuam editáveis.</small>';wrap.before(d);this.refreshDatalist();document.getElementById("tCardName").addEventListener("change",e=>this.fillCardFields(e.target.value));document.getElementById("tCardName").addEventListener("blur",e=>this.fillCardFields(e.target.value));},
+    syncFormVisibility(){const f=document.getElementById("tCardFields");if(!f)return;const on=document.getElementById("tType")?.value==="expense"&&document.getElementById("tCreditCard")?.checked;f.classList.toggle("hidden",!on);},
+    addInvoiceControls(){const title=document.getElementById("ccInvoiceTitle");if(!title||document.getElementById("ccCardSelect"))return;const s=document.createElement("select");s.id="ccCardSelect";s.setAttribute("aria-label","Filtrar cartão");s.style.marginLeft="8px";title.parentElement.appendChild(s);s.addEventListener("change",()=>renderCreditCard());const total=document.getElementById("ccInvoiceTotal"),b=document.createElement("button");b.type="button";b.id="ccPayInvoice";b.className="btn btn-primary btn-small";b.style.marginTop="14px";b.textContent="Registrar pagamento da fatura";total.after(b);b.addEventListener("click",()=>this.payInvoice());this.refreshDatalist();},
+    payInvoice(){const ym=document.getElementById("ccMonthSelect")?.value||selectedMonth,p=creditCardTransactionsForMonth(ym),total=p.reduce((s,t)=>s+Number(t.amount||0),0);if(!total){toast("Esta fatura não possui compras.");return;}const cardId=document.getElementById("ccCardSelect")?.value||"",card=this.cards().find(x=>x.id===cardId);openModal();document.getElementById("tType").value="transfer";document.getElementById("tDescription").value=`Pagamento fatura ${card?.name||"cartão"} — ${monthName(ym)}`;document.getElementById("tAmount").value=total.toFixed(2);document.getElementById("tDetails").value=`Pagamento da fatura ${ym}${card?" · "+card.name:""}`;updateCcVisibility();},
+    dashboardAlerts(){const dash=document.getElementById("dashboard");if(!dash)return;let box=document.getElementById("v171Attention");const spent={};transactionsForMonth(selectedMonth).filter(t=>t.type==="expense").forEach(t=>spent[t.category]=(spent[t.category]||0)+Number(t.amount||0));const alerts=categories.map(cat=>{const budget=Number(state.budgets?.[cat]||0),used=Number(spent[cat]||0);return{cat,budget,used,pct:budget?used/budget*100:0,left:budget-used};}).filter(x=>x.budget&&x.pct>=70).sort((a,b)=>b.pct-a.pct);if(!alerts.length){if(box)box.remove();return;}if(!box){box=document.createElement("div");box.id="v171Attention";box.className="card section";dash.prepend(box);}box.innerHTML=`<div class="section-title"><h3>Atenção este mês</h3><span>${alerts.length} alerta(s)</span></div>`+alerts.slice(0,5).map(x=>`<div class="v17-alert ${x.pct>=100?"v17-danger":x.pct>=90?"v17-warn":""}" style="cursor:pointer" data-budget-cat="${esc(x.cat)}"><strong>${esc(x.cat)}</strong> está em ${Math.round(x.pct)}% do orçamento · <span class="privacy-value">${money(x.used)} de ${money(x.budget)}</span> · restam <span class="privacy-value">${money(x.left)}</span></div>`).join("");box.querySelectorAll("[data-budget-cat]").forEach(el=>el.onclick=()=>{document.querySelector('.tab[data-view="budget"]')?.click();setTimeout(()=>openBudgetModal(el.dataset.budgetCat),50);});},
+    init(){state.cards=state.cards||[];this.addForm();this.addInvoiceControls();this.syncFormVisibility();this.dashboardAlerts();document.getElementById("tCreditCard")?.addEventListener("change",()=>this.syncFormVisibility());document.getElementById("tType")?.addEventListener("change",()=>this.syncFormVisibility());const oldOpen=window.openModal;window.openModal=(id)=>{oldOpen(id);setTimeout(()=>{this.syncFormVisibility();const tx=getEditingTx();if(tx?.cardId){const card=this.cards().find(x=>x.id===tx.cardId);document.getElementById("tCardName").value=tx.cardName||card?.name||"";document.getElementById("tCardClosing").value=card?.closingDay||"";document.getElementById("tCardDue").value=card?.dueDay||"";}},0);};const mo=new MutationObserver(()=>this.dashboardAlerts()),d=document.getElementById("mExpense");if(d)mo.observe(d,{childList:true,characterData:true,subtree:true});}
+  };
+  window.V171Cards=V171Cards;setTimeout(()=>V171Cards.init(),0);
+  /* /FINANCAS_V171_CORRECTIONS */
 
   /* FINANCAS_V17_EXTENSION */
   const V17={
