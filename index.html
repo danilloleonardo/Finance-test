@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.0.8</title>
+  <title>Finanças a Dois — V2.0.9</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2689,9 +2689,32 @@ Regras:
   function importDuplicate(row){
     return state.transactions.some(t=>String(t.date||"")===row.date && Math.abs(Number(t.amount||0)-row.amount)<0.01 && aiNormalize(`${t.description} ${t.channel}`).includes(aiNormalize(row.merchant).slice(0,8)));
   }
+  function fillTransactionFromImport(r){
+    closeSmartImport();
+    openModal();
+    $("ocrBox").style.display="none";
+    $("modalTitle").textContent="Conferir lançamento";
+    $("modalSubmitBtn").textContent=TEST_READ_ONLY?"Somente leitura":"Salvar lançamento";
+    $("tType").value="expense";
+    $("tDate").value=r.date||aiToday(0);
+    $("tDescription").value=r.merchant||r.original||"";
+    $("tResponsible").value=r.responsible||"Danillo";
+    $("tCategory").value=r.category||"Outros";
+    $("tAmount").value=Number(r.amount||0).toFixed(2);
+    $("tChannel").value=r.merchant||"";
+    $("tDetails").value=r.original&&r.original!==r.merchant?`Importado de foto/arquivo · Original: ${r.original}`:"Importado de foto/arquivo";
+    updateCcVisibility();
+    $("tDescription").focus();
+  }
   function renderSmartImport(){
     const box=$("importPreview");
     if(!smartImportRows.length){box.innerHTML='<div class="empty">Nenhuma transação identificada.</div>';return;}
+    if(smartImportRows.length===1){
+      const r=smartImportRows[0];
+      r.responsible=r.responsible||"Danillo";
+      fillTransactionFromImport(r);
+      return;
+    }
     box.innerHTML=smartImportRows.map((r,i)=>`<div class="import-row entry-confirmation">
       <input type="checkbox" class="import-check" data-i="${i}" ${r.duplicate?"":"checked"} aria-label="Selecionar transação">
       <div class="import-field date"><label class="import-label">Data</label><input type="date" class="import-date privacy-entry-visible" data-i="${i}" value="${esc(r.date)}"></div>
@@ -2704,9 +2727,9 @@ Regras:
     $("importConfirmBtn").title=TEST_READ_ONLY?"Ambiente de teste: somente leitura":"";
   }
   function showSmartImport(rows,label){
-    smartImportRows=rows.map(r=>({...r,merchant:importGuessMerchant(r.original),category:importGuessCategory(importGuessMerchant(r.original))})).map(r=>({...r,duplicate:importDuplicate(r)}));
+    smartImportRows=rows.map(r=>({...r,merchant:importGuessMerchant(r.original),category:importGuessCategory(importGuessMerchant(r.original)),responsible:"Danillo"})).map(r=>({...r,duplicate:importDuplicate(r)}));
     $("importBackdrop").classList.add("open");
-    $("importStatus").textContent=`${label}: ${smartImportRows.length} transação(ões) encontrada(s). Revise estabelecimento, categoria e responsável. Neste ambiente de teste nada será gravado.`;
+    $("importStatus").textContent=`${label}: ${smartImportRows.length} transação(ões) encontrada(s). Revise os dados antes de salvar.`;
     renderSmartImport();
   }
   function parseCsvImport(text){
