@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V1.7.1</title>
+  <title>Finanças a Dois — V1.7.2</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1992,7 +1992,15 @@ Regras:
       const from=$( "fromDate")?.value||""; const to=$( "toDate")?.value||"";
       if(from) tx=tx.filter(t=>t.date && t.date>=from); if(to) tx=tx.filter(t=>t.date && t.date<=to);
     }
-    return tx.sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+    // Mais recente primeiro. Em lançamentos do mesmo dia, o último cadastrado/editado fica no topo.
+    return tx.sort((a,b)=>{
+      const byDate=String(b.date||"").localeCompare(String(a.date||""));
+      if(byDate) return byDate;
+      const aOrder=Number(a.createdAt||a.updatedAt||0), bOrder=Number(b.createdAt||b.updatedAt||0);
+      if(aOrder!==bOrder) return bOrder-aOrder;
+      // Compatibilidade com lançamentos antigos sem timestamp: mantém os mais novos no array primeiro.
+      return state.transactions.indexOf(b)-state.transactions.indexOf(a);
+    });
   }
 
   function renderTransactions(){
@@ -2376,8 +2384,11 @@ Regras:
 
     const selectedCard = (baseType==="expense" && $("tCreditCard").checked && window.V171Cards) ? window.V171Cards.ensureCardFromForm() : null;
     if(baseType==="expense" && $("tCreditCard").checked && !selectedCard){ showTransactionFeedback("Informe o cartão, fechamento e vencimento."); return; }
+    const nowTs=Date.now();
     const common={
       type:baseType,
+      createdAt: editingTx?.createdAt || nowTs,
+      updatedAt: nowTs,
       description:$("tDescription").value.trim(),
       category:$("tCategory").value,
       responsible:$("tResponsible").value,
