@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.0.6</title>
+  <title>Finanças a Dois — V2.0.7</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2778,7 +2778,8 @@ Regras:
             .map(m=>({raw:m[1],amount:importParseMoney(m[1])}))
             .filter(x=>x.amount>=0.5&&x.amount<100000);
           // Evita números de CNPJ/data e prefere candidatos próximos a termos de pagamento.
-          let hit=loose.find(x=>{\n            const escaped=String(x.raw).replace(/[.*+?^$()|[\\]\\\\]/g,"\\\\$&");\n            return new RegExp("(?:credito|debito|total|valor|r.?\\\\$?).{0,30}"+escaped,"i").test(all);\n          });\n          if(!hit) hit=loose[0];
+          let hit=loose.find(x=> /(?:credito|debito|total|valor)/i.test(all));
+          if(!hit) hit=loose[0];
           if(hit) rows.push({
             date:dm?importNormalizeDate(dm[0]):aiToday(0),
             amount:hit.amount,
