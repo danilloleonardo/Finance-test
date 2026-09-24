@@ -2845,19 +2845,38 @@ Regras:
     try{
       const result=await Tesseract.recognize(file,"por+eng",{logger:m=>{if(m.status==="recognizing text") status.textContent=`Lendo o print… ${Math.round((m.progress||0)*100)}%`;}});
       const text=result.data.text||"";
-      const dateMatch=text.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\b/);
+      // NFC-e: prioriza data de autorização/emissão; evita capturar datas incidentais.
+      const normalizedText=text.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ");
+      const datePatterns=[
+        /data\s+de\s+autorizacao[^\d]{0,20}(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/i,
+        /(?:nfce|nfc-e)[\s\S]{0,80}?(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/i,
+        /(?:emissao|emitida|data)[^\d]{0,20}(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/i,
+        /\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\b/
+      ];
+      let dateMatch=null;
+      for(const rx of datePatterns){dateMatch=normalizedText.match(rx);if(dateMatch)break;}
       if(dateMatch){let y=dateMatch[3];if(y.length===2)y="20"+y;$("tDate").value=`${y}-${String(dateMatch[2]).padStart(2,"0")}-${String(dateMatch[1]).padStart(2,"0")}`;}
-      const amounts=[];
-      const re=/R\$?\s*([0-9]{1,3}(?:\.[0-9]{3})*,\d{2}|[0-9]+,\d{2})/g; let m;
-      while((m=re.exec(text))) amounts.push(m[1]);
-      if(amounts.length){const raw=amounts[amounts.length-1].replace(/\./g,"").replace(",",".");const val=parseFloat(raw);if(val>0)$("tAmount").value=val.toFixed(2);}
+      // Valor: usa somente rótulos fiscais confiáveis. Não usa "último número" do OCR,
+      // evitando confundir CNPJ, chave NFC-e, protocolo, COO ou NSU com a compra.
+      const money=v=>{const n=parseFloat(String(v||"").replace(/\./g,"").replace(",",".").replace(/[^\d.-]/g,""));return Number.isFinite(n)&&n>0&&n<1000000?n:null;};
+      const amountPatterns=[
+        /valor\s+total\s*(?:r\$|rs)?\s*[:.]?\s*(\d{1,6}[.,]\d{2})/i,
+        /total\s+a\s+pagar\s*(?:r\$|rs)?\s*[:.]?\s*(\d{1,6}[.,]\d{2})/i,
+        /total\s*(?:r\$|rs)\s*[:.]?\s*(\d{1,6}[.,]\d{2})/i,
+        /\btef1?\s*(?:r\$|rs)?\s*[:.]?\s*(\d{1,6}[.,]\d{2})/i,
+        /(?:debito|credito)\s+(?:a\s+vista\s+)?(?:r\$|rs)?\s*[:.]?\s*(\d{1,6}[.,]\d{2})/i
+      ];
+      let val=null;
+      for(const rx of amountPatterns){const mm=normalizedText.match(rx);if(mm){val=money(mm[1]);if(val!==null)break;}}
+      if(val!==null)$("tAmount").value=val.toFixed(2);else $("tAmount").value="";
       const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(x=>x.length>=3);
       const skip=/pix|valor|data|hora|comprovante|pagamento|cart[aã]o|documento|autoriz|transa[cç][aã]o|total|cnpj|cpf|saldo/i;
       const desc=lines.find(x=>!skip.test(x) && !/^[\d\W_]+$/.test(x) && x.length<80);
       if(desc && !$("tDescription").value) $("tDescription").value=desc;
+      if(/cia brasileira de distribui[cç][aã]o|p[aã]o de a[cç][uú]car/i.test(text)) $("tChannel").value="Pão de Açúcar";
       const lower=text.toLowerCase();
       const cats=["Almoço-Trabalho","Alimentação","Cartão de crédito","Compras","Cuidados pessoais","Dívidas","Dízimo/Doações","Educação","Farmácia","Financiamento e parcelas","Impostos e Documentos","Lazer","Mercado","Moradia","Outros","Saúde","Transferências","Transporte","Vestuário"];
-      const hints={"Mercado":/mercado(?! livre)|hortifruti|hortifruit|sacol[aã]o|atacad[aã]o|sams club|andorinha|assa[ií]|carrefour/,"Almoço-Trabalho":/almoço.*trabalho|almoco.*trabalho|refei[cç][aã]o.*trabalho|almo[cç]o.*expediente/,"Alimentação":/ifood|restaurante|padaria|alimenta|lanche|almoço|jantar/,"Saúde":/hospital|cl[ií]nica|sa[uú]de|amil|consulta|vacina|dentista/,"Farmácia":/farm[aá]cia|drogaria|rem[eé]dio|medicamento/,"Transporte":/uber|99|gasolina|posto|estacionamento|combust[ií]vel|moto|carro/,"Moradia":/aluguel|condom[ií]nio|energia|luz|[áa]gua|g[aá]s/,"Compras":/shopee|mercado livre|amazon|compra|eletrodom[eé]stico/,"Vestuário":/riachuelo|shein|c&a|roupa|cal[çc]a|camisa|vestido|sapato|t[êe]nis/,"Lazer":/cinema|viagem|bar|festival|restaurante/,"Cuidados pessoais":/barbeiro|cabeleireiro|sal[aã]o|est[eé]tica/,"Educação":/escola|faculdade|curso|mensalidade|matr[ií]cula|universidade|col[eé]gio/,"Financiamento e parcelas":/financiamento|cons[oó]rcio|parcela/,"Dízimo/Doações":/d[ií]zimo|oferta|doa[çc][aã]o|igreja/,"Impostos e Documentos":/imposto|ipva|iptu|taxa|cart[oó]rio|documento|darf/,"Transferências":/\bpix\b|\bted\b|\bdoc\b|transfer[eê]ncia/};
+      const hints={"Mercado":/pao de acucar|pão de açúcar|cia brasileira de distribuicao|cia brasileira de distribuição|supermercado|mercado(?! livre)|hortifruti|hortifruit|sacol[aã]o|atacad[aã]o|sams club|andorinha|assa[ií]|carrefour|extra\b/,"Almoço-Trabalho":/almoço.*trabalho|almoco.*trabalho|refei[cç][aã]o.*trabalho|almo[cç]o.*expediente/,"Alimentação":/ifood|restaurante|padaria|alimenta|lanche|almoço|jantar/,"Saúde":/hospital|cl[ií]nica|sa[uú]de|amil|consulta|vacina|dentista/,"Farmácia":/farm[aá]cia|drogaria|rem[eé]dio|medicamento/,"Transporte":/uber|99|gasolina|posto|estacionamento|combust[ií]vel|moto|carro/,"Moradia":/aluguel|condom[ií]nio|energia|luz|conta de [áa]gua|conta de g[aá]s/,"Compras":/shopee|mercado livre|amazon|compra|eletrodom[eé]stico/,"Vestuário":/riachuelo|shein|c&a|roupa|cal[çc]a|camisa|vestido|sapato|t[êe]nis/,"Lazer":/cinema|viagem|bar|festival|restaurante/,"Cuidados pessoais":/barbeiro|cabeleireiro|sal[aã]o|est[eé]tica/,"Educação":/escola|faculdade|curso|mensalidade|matr[ií]cula|universidade|col[eé]gio/,"Financiamento e parcelas":/financiamento|cons[oó]rcio|parcela/,"Dízimo/Doações":/d[ií]zimo|oferta|doa[çc][aã]o|igreja/,"Impostos e Documentos":/imposto|ipva|iptu|taxa|cart[oó]rio|documento|darf/,"Transferências":/\bpix\b|\bted\b|\bdoc\b|transfer[eê]ncia/};
       const cat=["Mercado",...cats].find(c=>hints[c]?.test(lower)); if(cat)$("tCategory").value=cat;
       $("tType").value="expense";
       clearTransactionFeedback();
