@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.0.13</title>
+  <title>Finanças a Dois — V2.0.14</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2820,7 +2820,7 @@ Regras:
       console.error("Leitura da foto por IA falhou:",err);
       smartImportRows=[];
       $("importPreview").innerHTML="";
-      $("importStatus").textContent="Não consegui analisar essa imagem com a IA. Nenhum dado foi salvo. Tente novamente.";
+      const safeCode=String(err?.code||"").replace(/[^a-zA-Z0-9_./:-]/g,"").slice(0,120);\n      const safeMessage=String(err?.message||"").replace(/https?:\\/\\/\\S+/g,"[link]").replace(/[A-Za-z0-9_-]{28,}/g,"[oculto]").slice(0,240);\n      $("importStatus").textContent="Diagnóstico IA: "+(safeCode?("["+safeCode+"] "):"")+(safeMessage||"falha não identificada")+". Nenhum dado foi salvo.";
     }finally{e.target.value=""}
   });
   $("importConfirmBtn").addEventListener("click",()=>toast("Ambiente de teste: importação não grava dados."));
@@ -2897,7 +2897,7 @@ Regras obrigatórias:
         : "IA concluiu a leitura. Confira todos os campos antes de salvar.";
     }catch(err){
       console.error("Leitura por IA falhou:",err);
-      status.textContent="Não consegui analisar este comprovante com a IA. Nenhum dado foi salvo. Tente novamente ou preencha manualmente.";
+      const safeCode=String(err?.code||"").replace(/[^a-zA-Z0-9_./:-]/g,"").slice(0,120);\n      const safeMessage=String(err?.message||"").replace(/https?:\\/\\/\\S+/g,"[link]").replace(/[A-Za-z0-9_-]{28,}/g,"[oculto]").slice(0,240);\n      status.textContent="Diagnóstico IA: "+(safeCode?("["+safeCode+"] "):"")+(safeMessage||"falha não identificada")+". Nenhum dado foi salvo.";
     }finally{
       e.target.value="";
     }
