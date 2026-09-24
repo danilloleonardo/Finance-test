@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.0.11</title>
+  <title>Finanças a Dois — V2.0.12</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2837,53 +2837,82 @@ Regras:
   });
   $("importConfirmBtn").addEventListener("click",()=>toast("Ambiente de teste: importação não grava dados."));
 
-  // OCR de comprovantes/prints. O arquivo é processado no navegador; não é enviado ao Firestore.
+  // V2.0.12 — leitura de comprovantes por Gemini multimodal (Firebase AI Logic).
+  // A imagem é enviada à IA apenas para extração; nenhum lançamento é salvo sem confirmação no formulário.
   $("receiptImage").addEventListener("change",async e=>{
     const file=e.target.files?.[0]; if(!file)return;
     const preview=$("ocrPreview"); preview.src=URL.createObjectURL(file); preview.style.display="block";
-    const status=$("ocrStatus"); status.textContent="Lendo o print… isso pode levar alguns segundos.";
+    const status=$("ocrStatus");
+    status.textContent="Analisando comprovante com IA…";
     try{
-      const result=await Tesseract.recognize(file,"por+eng",{logger:m=>{if(m.status==="recognizing text") status.textContent=`Lendo o print… ${Math.round((m.progress||0)*100)}%`;}});
-      const text=result.data.text||"";
-      // NFC-e: prioriza data de autorização/emissão; evita capturar datas incidentais.
-      const normalizedText=text.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ");
-      const datePatterns=[
-        /data\s+de\s+autorizacao[^\d]{0,20}(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/i,
-        /(?:nfce|nfc-e)[\s\S]{0,80}?(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/i,
-        /(?:emissao|emitida|data)[^\d]{0,20}(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/i,
-        /\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\b/
-      ];
-      let dateMatch=null;
-      for(const rx of datePatterns){dateMatch=normalizedText.match(rx);if(dateMatch)break;}
-      if(dateMatch){let y=dateMatch[3];if(y.length===2)y="20"+y;$("tDate").value=`${y}-${String(dateMatch[2]).padStart(2,"0")}-${String(dateMatch[1]).padStart(2,"0")}`;}
-      // Valor: usa somente rótulos fiscais confiáveis. Não usa "último número" do OCR,
-      // evitando confundir CNPJ, chave NFC-e, protocolo, COO ou NSU com a compra.
-      const money=v=>{const n=parseFloat(String(v||"").replace(/\./g,"").replace(",",".").replace(/[^\d.-]/g,""));return Number.isFinite(n)&&n>0&&n<1000000?n:null;};
-      const amountPatterns=[
-        /valor\s+total\s*(?:r\$|rs)?\s*[:.]?\s*(\d{1,6}[.,]\d{2})/i,
-        /total\s+a\s+pagar\s*(?:r\$|rs)?\s*[:.]?\s*(\d{1,6}[.,]\d{2})/i,
-        /total\s*(?:r\$|rs)\s*[:.]?\s*(\d{1,6}[.,]\d{2})/i,
-        /\btef1?\s*(?:r\$|rs)?\s*[:.]?\s*(\d{1,6}[.,]\d{2})/i,
-        /(?:debito|credito)\s+(?:a\s+vista\s+)?(?:r\$|rs)?\s*[:.]?\s*(\d{1,6}[.,]\d{2})/i
-      ];
-      let val=null;
-      for(const rx of amountPatterns){const mm=normalizedText.match(rx);if(mm){val=money(mm[1]);if(val!==null)break;}}
-      if(val!==null)$("tAmount").value=val.toFixed(2);else $("tAmount").value="";
-      const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(x=>x.length>=3);
-      const skip=/pix|valor|data|hora|comprovante|pagamento|cart[aã]o|documento|autoriz|transa[cç][aã]o|total|cnpj|cpf|saldo/i;
-      const desc=lines.find(x=>!skip.test(x) && !/^[\d\W_]+$/.test(x) && x.length<80);
-      if(desc && !$("tDescription").value) $("tDescription").value=desc;
-      if(/cia brasileira de distribui[cç][aã]o|p[aã]o de a[cç][uú]car/i.test(text)) $("tChannel").value="Pão de Açúcar";
-      const lower=text.toLowerCase();
-      const cats=["Almoço-Trabalho","Alimentação","Cartão de crédito","Compras","Cuidados pessoais","Dívidas","Dízimo/Doações","Educação","Farmácia","Financiamento e parcelas","Impostos e Documentos","Lazer","Mercado","Moradia","Outros","Saúde","Transferências","Transporte","Vestuário"];
-      const hints={"Mercado":/pao de acucar|pão de açúcar|cia brasileira de distribuicao|cia brasileira de distribuição|supermercado|mercado(?! livre)|hortifruti|hortifruit|sacol[aã]o|atacad[aã]o|sams club|andorinha|assa[ií]|carrefour|extra\b/,"Almoço-Trabalho":/almoço.*trabalho|almoco.*trabalho|refei[cç][aã]o.*trabalho|almo[cç]o.*expediente/,"Alimentação":/ifood|restaurante|padaria|alimenta|lanche|almoço|jantar/,"Saúde":/hospital|cl[ií]nica|sa[uú]de|amil|consulta|vacina|dentista/,"Farmácia":/farm[aá]cia|drogaria|rem[eé]dio|medicamento/,"Transporte":/uber|99|gasolina|posto|estacionamento|combust[ií]vel|moto|carro/,"Moradia":/aluguel|condom[ií]nio|energia|luz|conta de [áa]gua|conta de g[aá]s/,"Compras":/shopee|mercado livre|amazon|compra|eletrodom[eé]stico/,"Vestuário":/riachuelo|shein|c&a|roupa|cal[çc]a|camisa|vestido|sapato|t[êe]nis/,"Lazer":/cinema|viagem|bar|festival|restaurante/,"Cuidados pessoais":/barbeiro|cabeleireiro|sal[aã]o|est[eé]tica/,"Educação":/escola|faculdade|curso|mensalidade|matr[ií]cula|universidade|col[eé]gio/,"Financiamento e parcelas":/financiamento|cons[oó]rcio|parcela/,"Dízimo/Doações":/d[ií]zimo|oferta|doa[çc][aã]o|igreja/,"Impostos e Documentos":/imposto|ipva|iptu|taxa|cart[oó]rio|documento|darf/,"Transferências":/\bpix\b|\bted\b|\bdoc\b|transfer[eê]ncia/};
-      const cat=["Mercado",...cats].find(c=>hints[c]?.test(lower)); if(cat)$("tCategory").value=cat;
-      $("tType").value="expense";
+      if(!window.financasGemini?.ready || !window.financasGemini?.generateImage){
+        throw new Error("Firebase AI Logic ainda não está disponível neste navegador.");
+      }
+      if(!/^image\//i.test(file.type||"")) throw new Error("Selecione uma imagem do comprovante.");
+      if(file.size>7*1024*1024) throw new Error("A imagem é maior que 7 MB. Reduza o tamanho e tente novamente.");
+
+      const dataUrl=await new Promise((resolve,reject)=>{
+        const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=()=>reject(new Error("Não consegui abrir a imagem.")); r.readAsDataURL(file);
+      });
+
+      const prompt=`
+Analise visualmente este comprovante, recibo, NFC-e ou comprovante de pagamento brasileiro.
+Não faça OCR aproximado nem invente campos ilegíveis. Use apenas o que estiver visível na imagem.
+
+Retorne SOMENTE JSON válido, sem markdown, exatamente neste formato:
+{"type":"expense","date":"YYYY-MM-DD","description":"","category":"","amount":null,"merchant":"","paymentMethod":"","creditCard":false,"confidence":"high|medium|low","reviewFields":[]}
+
+Regras obrigatórias:
+- amount é o VALOR FINAL EFETIVAMENTE PAGO pela compra.
+- Em NFC-e, priorize "VALOR TOTAL R$", "TOTAL A PAGAR" ou o total efetivamente cobrado.
+- NUNCA use como amount: tributos/impostos, "Trib Totais Incidentes", ICMS, valor unitário, quantidade, desconto isolado, troco, CNPJ, CPF, chave de acesso, protocolo, COO, NSU ou número de autorização.
+- date deve ser a data da compra/emissão/autorização da NFC-e; não use datas incidentais.
+- merchant deve ser o nome comercial reconhecível do estabelecimento. Se houver razão social e nome comercial claro, prefira o nome comercial.
+- description deve resumir os itens comprados de forma humana. Para um único item, use o nome do produto; para vários itens, faça um resumo curto e fiel.
+- category deve ser UMA destas opções: Almoço-Trabalho, Alimentação, Cartão de crédito, Compras, Cuidados pessoais, Dívidas, Dízimo/Doações, Educação, Farmácia, Financiamento e parcelas, Impostos e Documentos, Lazer, Mercado, Moradia, Outros, Saúde, Transferências, Transporte, Vestuário.
+- Compras em supermercado, mercado, hortifruti ou atacado devem usar "Mercado", inclusive água engarrafada e alimentos.
+- creditCard só é true quando a imagem indicar cartão de CRÉDITO. Débito deve ser false.
+- paymentMethod pode ser "Crédito", "Débito", "Pix", "Dinheiro", "Transferência" ou "".
+- Se um campo importante não estiver legível, deixe vazio/null e inclua seu nome em reviewFields.
+- confidence deve refletir a confiança geral. Não tente preencher texto corrompido.
+`.trim();
+
+      const raw=await window.financasGemini.generateImage(dataUrl,prompt);
+      const cleaned=String(raw||"").replace(/^\`\`\`json\s*/i,"").replace(/\`\`\`\s*$/,"").trim();
+      const data=JSON.parse(cleaned);
+      const allowedCats=new Set(categories);
+      const validDate=/^\d{4}-\d{2}-\d{2}$/.test(String(data.date||""))?String(data.date):"";
+      const amount=Number(data.amount);
+
+      $("tType").value=["expense","income","transfer"].includes(data.type)?data.type:"expense";
+      if(validDate) $("tDate").value=validDate;
+      $("tDescription").value=String(data.description||"").trim();
+      $("tCategory").value=allowedCats.has(data.category)?data.category:"Outros";
+      $("tAmount").value=Number.isFinite(amount)&&amount>0?amount.toFixed(2):"";
+      $("tChannel").value=String(data.merchant||"").trim();
+      $("tCreditCard").checked=data.creditCard===true;
+      $("tDetails").value="Importado de foto/arquivo com IA"+(data.paymentMethod?(" • "+String(data.paymentMethod)):"");
+
       clearTransactionFeedback();
       updateCcVisibility();
       updateInstallmentSummary();
-      status.textContent="Leitura concluída. Confira data, descrição, categoria e valor antes de salvar.";
-    }catch(err){console.error(err);status.textContent="Não consegui ler o print automaticamente. Preencha os campos manualmente.";}
+
+      const missing=[];
+      if(!validDate) missing.push("data");
+      if(!$("tDescription").value) missing.push("descrição");
+      if(!$("tAmount").value) missing.push("valor");
+      if(!$("tChannel").value) missing.push("estabelecimento");
+      const review=Array.isArray(data.reviewFields)?data.reviewFields.filter(Boolean):[];
+      const pending=[...new Set([...missing,...review])];
+      status.textContent=pending.length
+        ? "IA concluiu a leitura, mas revise: "+pending.join(", ")+". Confira tudo antes de salvar."
+        : "IA concluiu a leitura. Confira todos os campos antes de salvar.";
+    }catch(err){
+      console.error("Leitura por IA falhou:",err);
+      status.textContent="Não consegui analisar este comprovante com a IA. Nenhum dado foi salvo. Tente novamente ou preencha manualmente.";
+    }finally{
+      e.target.value="";
+    }
   });
 
   $("monthSelect").addEventListener("change",e=>{selectedMonth=e.target.value;populateMonths();render()});
