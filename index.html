@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.0.16</title>
+  <title>Finanças a Dois — V2.0.17</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2721,12 +2721,14 @@ Regras:
     $("modalSubmitBtn").textContent=TEST_READ_ONLY?"Somente leitura":"Salvar lançamento";
     $("tType").value="expense";
     $("tDate").value=r.date||aiToday(0);
-    $("tDescription").value=r.merchant||r.original||"";
+    $("tDescription").value=r.description||r.merchant||r.original||"";
     $("tResponsible").value=r.responsible||"Danillo";
-    $("tCategory").value=r.category||"Outros";
+    $("tCategory").value=categories.includes(r.category)?r.category:"Outros";
     $("tAmount").value=Number(r.amount||0).toFixed(2);
     $("tChannel").value=r.merchant||"";
-    $("tDetails").value=r.original&&r.original!==r.merchant?`Importado de foto/arquivo · Original: ${r.original}`:"Importado de foto/arquivo";
+    const payment=String(r.paymentMethod||"").trim();
+    $("tCreditCard").checked=/cr[eé]dito/i.test(payment);
+    $("tDetails").value="Importado de foto/arquivo com IA"+(payment?(" • "+payment):"");
     updateCcVisibility();
     $("tDescription").focus();
   }
@@ -2751,7 +2753,12 @@ Regras:
     $("importConfirmBtn").title=TEST_READ_ONLY?"Ambiente de teste: somente leitura":"";
   }
   function showSmartImport(rows,label){
-    smartImportRows=rows.map(r=>({...r,merchant:importGuessMerchant(r.original),category:importGuessCategory(importGuessMerchant(r.original)),responsible:"Danillo"})).map(r=>({...r,duplicate:importDuplicate(r)}));
+    smartImportRows=rows.map(r=>{
+      const aiMerchant=String(r.merchant||"").trim();
+      const merchant=aiMerchant||importGuessMerchant(r.original);
+      const category=categories.includes(r.category)?r.category:importGuessCategory(merchant);
+      return {...r,merchant,category,responsible:r.responsible||"Danillo"};
+    }).map(r=>({...r,duplicate:importDuplicate(r)}));
     $("importBackdrop").classList.add("open");
     $("importStatus").textContent=`${label}: ${smartImportRows.length} transação(ões) encontrada(s). Revise os dados antes de salvar.`;
     renderSmartImport();
