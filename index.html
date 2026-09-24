@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.0.17</title>
+  <title>Finanças a Dois — V2.6 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -854,6 +854,17 @@
     .values-hidden #importBackdrop .import-original{color:var(--muted)!important}
     @media(max-width:900px){.import-row{grid-template-columns:32px 1fr 1fr}.import-field.merchant{grid-column:2/-1}.import-field.category{grid-column:2}.import-field.responsible{grid-column:3}.import-field.amount{grid-column:2/-1}}
     @media(max-width:600px){.import-row{grid-template-columns:28px 1fr;gap:10px}.import-field,.import-field.merchant,.import-field.category,.import-field.responsible,.import-field.amount{grid-column:2}.toolbar .actions{gap:6px}.toolbar .actions .btn{padding:9px 10px}}
+
+/* FINANCAS_V26_ROADMAP */
+.v26-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
+.v26-stat,.v26-insight{padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--card)}
+.v26-stat small,.v26-insight small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.45px;font-weight:800;margin-bottom:6px}
+.v26-stat strong{font-family:var(--font-display);font-size:18px}
+.v26-insights{display:grid;gap:8px;margin-top:12px}
+.v26-card-settings{display:grid;grid-template-columns:1fr 1fr auto;gap:9px;align-items:end;margin:12px 0}
+@media(max-width:760px){.v26-grid{grid-template-columns:1fr 1fr}.v26-card-settings{grid-template-columns:1fr 1fr}.v26-card-settings .btn{grid-column:1/-1}}
+@media(max-width:480px){.v26-grid{grid-template-columns:1fr}}
+/* /FINANCAS_V26_ROADMAP */
 </style>
 </head>
 
@@ -3610,6 +3621,60 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
   };
   setTimeout(function(){V17.init()},0);
   /* /FINANCAS_V17_EXTENSION */
+
+  /* FINANCAS_V26_ROADMAP — V2.1 + V2.2 + V2.3 + V2.6 */
+  const V26={
+    monthOffset(ym,n){const [y,m]=String(ym).split("-").map(Number),d=new Date(y,m-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")},
+    monthTotals(ym){const a=state.transactions.filter(t=>(t.month||(t.date||"").slice(0,7))===ym);return a.reduce((o,t)=>{const v=Number(t.amount||0);if(t.type==="income")o.income+=v;else if(t.type==="expense")o.expense+=v;return o},{income:0,expense:0})},
+    budgetTotal(){const b=(state.budgets&&state.budgets[selectedMonth])||state.budgets||{};return Object.values(b||{}).reduce((s,v)=>s+Number(v||0),0)},
+    pct(now,prev){return prev?((now-prev)/prev)*100:null},
+    signed(v){if(v===null||!Number.isFinite(v))return "—";return (v>0?"+":"")+v.toFixed(1)+"%"},
+    ensureClosing(){
+      const dash=document.getElementById("dashboard"); if(!dash)return;
+      let box=document.getElementById("v26Closing");
+      if(!box){box=document.createElement("div");box.id="v26Closing";box.className="card section";const anchor=document.getElementById("v171Attention")||dash.firstElementChild;anchor?anchor.after(box):dash.prepend(box)}
+      const cur=this.monthTotals(selectedMonth),prev=this.monthTotals(this.monthOffset(selectedMonth,-1)),bal=cur.income-cur.expense,pbal=prev.income-prev.expense,budget=this.budgetTotal(),usage=budget?cur.expense/budget*100:null;
+      const exp=transactionsForMonth(selectedMonth).filter(t=>t.type==="expense"),cats={};exp.forEach(t=>cats[t.category||"Outros"]=(cats[t.category||"Outros"]||0)+Number(t.amount||0));const top=Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];
+      const now=new Date(),current=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0"),elapsed=selectedMonth===current?Math.max(.05,now.getDate()/new Date(now.getFullYear(),now.getMonth()+1,0).getDate()):1,forecast=cur.expense/elapsed;
+      const insights=[];
+      const ed=this.pct(cur.expense,prev.expense); if(ed!==null)insights.push("Despesas "+(ed>0?"subiram ":"caíram ")+Math.abs(ed).toFixed(1)+"% em relação ao mês anterior.");
+      if(usage!==null)insights.push("O orçamento está "+usage.toFixed(0)+"% consumido.");
+      if(top)insights.push("Maior categoria do mês: "+top[0]+" ("+money(top[1])+").");
+      if(selectedMonth===current)insights.push("Mantido o ritmo atual, a projeção de despesas é "+money(forecast)+".");
+      box.innerHTML='<div class="section-title"><h3>Fechamento mensal</h3><span>V2.1 · CFO 2.0</span></div><div class="v26-grid">'+
+        '<div class="v26-stat"><small>Receita vs anterior</small><strong>'+this.signed(this.pct(cur.income,prev.income))+'</strong></div>'+
+        '<div class="v26-stat"><small>Despesa vs anterior</small><strong>'+this.signed(ed)+'</strong></div>'+
+        '<div class="v26-stat"><small>Variação do saldo</small><strong>'+this.signed(this.pct(bal,pbal))+'</strong></div>'+
+        '<div class="v26-stat"><small>Uso do orçamento</small><strong>'+(usage===null?"—":usage.toFixed(0)+"%")+'</strong></div></div>'+
+        '<div class="section-title" style="margin-top:16px"><h3>✨ Leitura CFO</h3><span>V2.2</span></div><div class="v26-insights">'+insights.map(x=>'<div class="v26-insight">'+esc(x)+'</div>').join("")+'</div>';
+    },
+    cardSettings(){state.creditCardSettings=state.creditCardSettings||{closingDay:5,dueDay:12};state.creditCardPayments=state.creditCardPayments||{};return state.creditCardSettings},
+    ensureCardControls(){
+      const view=document.getElementById("creditCard");if(!view)return;let host=document.getElementById("v26CardConfig");
+      if(!host){host=document.createElement("div");host.id="v26CardConfig";host.className="card section";view.prepend(host)}
+      const s=this.cardSettings(),ym=document.getElementById("ccMonthSelect")?.value||selectedMonth,paid=!!state.creditCardPayments[ym];
+      host.innerHTML='<div class="section-title"><h3>Configuração da fatura</h3><span>V2.3</span></div><div class="v26-card-settings"><div class="field"><label>Fechamento</label><input id="v26ClosingDay" type="number" min="1" max="31" value="'+s.closingDay+'"></div><div class="field"><label>Vencimento</label><input id="v26DueDay" type="number" min="1" max="31" value="'+s.dueDay+'"></div><button class="btn btn-small" id="v26SaveCard">Salvar datas</button></div><div class="v26-insight"><small>Status da fatura '+esc(ym)+'</small><strong>'+(paid?"Paga":"Em aberto")+'</strong> · <button class="btn btn-small" id="v26TogglePaid">'+(paid?"Desfazer pagamento":"Registrar pagamento")+'</button></div>';
+      document.getElementById("v26SaveCard").onclick=()=>{state.creditCardSettings={closingDay:Math.max(1,Math.min(31,Number(document.getElementById("v26ClosingDay").value)||5)),dueDay:Math.max(1,Math.min(31,Number(document.getElementById("v26DueDay").value)||12))};save();toast("Datas do cartão salvas.");this.ensureCardControls()};
+      document.getElementById("v26TogglePaid").onclick=()=>this.toggleInvoicePayment(ym);
+    },
+    async toggleInvoicePayment(ym){
+      state.creditCardPayments=state.creditCardPayments||{};
+      const existing=state.transactions.find(t=>t.isCreditCardPayment&&t.invoiceMonth===ym);
+      if(existing){state.transactions=state.transactions.filter(t=>t.id!==existing.id);delete state.creditCardPayments[ym];await deleteTransactionCloud(existing.id);save();toast("Pagamento da fatura desfeito.");this.refresh();return}
+      const purchases=creditCardTransactionsForMonth(ym),amount=purchases.reduce((s,t)=>s+Number(t.amount||0),0);if(!amount){toast("Esta fatura não possui compras.");return}
+      const due=this.cardSettings().dueDay,[y,m]=ym.split("-").map(Number),last=new Date(y,m,0).getDate(),date=ym+"-"+String(Math.min(due,last)).padStart(2,"0"),tx={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),type:"transfer",description:"Pagamento fatura cartão — "+monthName(ym),amount,category:"Transferências",responsible:"Compartilhado",date,month:ym,details:"Pagamento de fatura registrado como transferência para não duplicar despesas.",isCreditCardPayment:true,invoiceMonth:ym,createdAt:new Date().toISOString()};
+      state.transactions.push(tx);state.creditCardPayments[ym]=true;await saveTransactionCloud(tx);save();toast("Pagamento registrado como transferência.");this.refresh();
+    },
+    aiContextPatch(){
+      if(typeof aiFinancialContext!=="function"||aiFinancialContext.__v26)return;
+      const original=aiFinancialContext;const self=this;
+      aiFinancialContext=function(){const base=original();let obj;try{obj=typeof base==="string"?JSON.parse(base):base}catch(_){return base}const ym=selectedMonth;obj.creditCard={settings:self.cardSettings(),selectedInvoice:{month:ym,total:creditCardTransactionsForMonth(ym).reduce((s,t)=>s+Number(t.amount||0),0),paid:!!state.creditCardPayments?.[ym]},nextSix:Array.from({length:6},(_,i)=>{const m=self.monthOffset(ym,i);return{month:m,total:creditCardTransactionsForMonth(m).reduce((s,t)=>s+Number(t.amount||0),0)}})};return typeof base==="string"?JSON.stringify(obj):obj};aiFinancialContext.__v26=true;
+    },
+    refresh(){this.ensureClosing();this.ensureCardControls();this.aiContextPatch()},
+    init(){this.cardSettings();this.refresh();document.addEventListener("click",e=>{if(e.target.closest(".tab,.month-chip,#ccMonthSelect"))setTimeout(()=>this.refresh(),80)});document.getElementById("monthSelect")?.addEventListener("change",()=>setTimeout(()=>this.refresh(),50))}
+  };
+  window.V26=V26;setTimeout(()=>V26.init(),0);
+  /* /FINANCAS_V26_ROADMAP */
 
 })();
 </script>
