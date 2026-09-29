@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.6 TEST</title>
+  <title>Finanças a Dois — V2.6.1 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2961,6 +2961,8 @@ Regras obrigatórias:
         dashboard:"Visão geral",transactions:"Lançamentos",creditcard:"Cartão de crédito",budget:"Orçamento",goals:"Metas",wealth:"Patrimônio"
       })[tab.dataset.view];
       if(tab.dataset.view==="creditcard") renderCreditCard();
+      // V2.6.1 TEST — cada aba se comporta como uma tela: abre sempre no topo.
+      requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:"auto"}));
     });
   });
 
