@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.7.0 TEST</title>
+  <title>Finanças a Dois — V2.8.0 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3774,5 +3774,76 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
 
 })();
 </script>
+
+<script>
+(function(){
+  /* FINANCAS_V28_CARD_COMPETENCE
+     Visões de despesa/orçamento: compra do cartão reconhecida integralmente na data da compra.
+     Aba Cartão: parcelas continuam distribuídas por fatura. Não regrava documentos existentes. */
+  const V28CardCompetence={
+    key(t){return t.originalPurchaseId||t.id},
+    isInstallment(t){return t&&t.type==="expense"&&t.isCreditCard&&Number(t.installmentTotal||1)>1},
+    purchaseMonth(t){return String(t.purchaseDate||t.date||"").slice(0,7)},
+    purchaseValue(t){return Number(t.purchaseAmount||t.amount||0)},
+    representative(t){
+      if(!this.isInstallment(t))return t;
+      const siblings=state.transactions.filter(x=>this.isInstallment(x)&&this.key(x)===this.key(t));
+      return siblings.find(x=>Number(x.installmentNumber||0)===1)||siblings[0]||t;
+    },
+    expenseViewForMonth(ym){
+      const out=[],seen=new Set();
+      state.transactions.forEach(t=>{
+        if(t.type!=="expense")return;
+        if(this.isInstallment(t)){
+          const k=this.key(t);if(seen.has(k)||this.purchaseMonth(t)!==ym)return;seen.add(k);
+          const r=this.representative(t);
+          out.push({...r,id:r.id,date:r.purchaseDate||r.date,month:ym,amount:this.purchaseValue(r),competencePurchase:true});
+        }else{
+          const m=t.month||(t.date||"").slice(0,7);if(m===ym)out.push(t);
+        }
+      });
+      return out;
+    },
+    generalViewForMonth(ym){
+      const expenses=this.expenseViewForMonth(ym),non=state.transactions.filter(t=>t.type!=="expense"&&(t.month||(t.date||"").slice(0,7))===ym);
+      return non.concat(expenses);
+    },
+    install(){
+      transactionsForMonth=(ym)=>this.generalViewForMonth(ym);
+      totals=(ym)=>this.generalViewForMonth(ym).reduce((a,t)=>{if(t.type==="income")a.income+=Number(t.amount||0);else if(t.type==="transfer"){}else a.expense+=Number(t.amount||0);return a},{income:0,expense:0});
+      const originalGet=getFilteredTransactions;
+      getFilteredTransactions=()=>{
+        const preset=document.getElementById("periodPreset")?.value||"month";
+        if(preset!=="month")return originalGet();
+        let tx=this.generalViewForMonth(selectedMonth);
+        const q=(document.getElementById("searchInput")?.value||"").trim().toLowerCase(),responsible=document.getElementById("responsibleFilter")?.value||"",type=document.getElementById("typeFilter")?.value||"";
+        if(q)tx=tx.filter(t=>[t.description,t.category,t.channel,t.details,t.responsible].some(v=>String(v||"").toLowerCase().includes(q)));
+        if(responsible)tx=tx.filter(t=>t.responsible===responsible);if(type)tx=tx.filter(t=>t.type===type);
+        return tx.sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||Number(b.createdAt||0)-Number(a.createdAt||0));
+      };
+      const originalTxDisplay=txDisplay;
+      txDisplay=(t)=>originalTxDisplay(t);
+      const originalRenderTransactions=renderTransactions;
+      renderTransactions=()=>{
+        originalRenderTransactions();
+        document.querySelectorAll("#transactionTable tr").forEach(row=>{
+          const text=row.textContent||"";if(/Parcela\s+\d+\/\d+/.test(text))row.innerHTML=row.innerHTML.replace(/Parcela\s+\d+\/\d+/,"Compra no cartão · valor total");
+        });
+      };
+      const originalRenderRecent=renderRecent;
+      renderRecent=()=>{originalRenderRecent();};
+      if(window.V27Budget){
+        const v=window.V27Budget;
+        v.spent=(ym)=>{const out={};V28CardCompetence.expenseViewForMonth(ym).forEach(t=>{const k=t.category||"Outros";out[k]=(out[k]||0)+Number(t.amount||0)});return out};
+      }
+      const s=document.createElement("style");s.textContent=".competence-note{font-size:10px;color:var(--muted);margin-top:3px}";document.head.appendChild(s);
+      render();
+    }
+  };
+  window.V28CardCompetence=V28CardCompetence;setTimeout(()=>V28CardCompetence.install(),120);
+  /* /FINANCAS_V28_CARD_COMPETENCE */
+})();
+</script>
+
 </body>
 </html>
