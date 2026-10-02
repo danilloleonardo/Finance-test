@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.6.1 TEST</title>
+  <title>Finanças a Dois — V2.7.0 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3677,6 +3677,100 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
   };
   window.V26=V26;setTimeout(()=>V26.init(),0);
   /* /FINANCAS_V26_ROADMAP */
+
+  /* FINANCAS_V27_MONTHLY_BUDGETS — orçamento mensal + referência do mês anterior */
+  const V27Budget={
+    monthOffset(ym,n){const [y,m]=String(ym).split("-").map(Number),d=new Date(y,m-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")},
+    monthMap(ym,create=false){
+      state.budgets=state.budgets||{};
+      if(state.budgets[ym] && typeof state.budgets[ym]==="object" && !Array.isArray(state.budgets[ym])) return state.budgets[ym];
+      if(create){state.budgets[ym]={};return state.budgets[ym]}
+      return {};
+    },
+    previousSpent(){
+      const prev=this.monthOffset(selectedMonth,-1),spent={};
+      state.transactions.filter(t=>t.type==="expense" && (t.month||(t.date||"").slice(0,7))===prev)
+        .forEach(t=>{const k=t.category||"Outros";spent[k]=(spent[k]||0)+Number(t.amount||0)});
+      return {month:prev,spent};
+    },
+    currentSpent(){
+      const spent={};
+      transactionsForMonth(selectedMonth).filter(t=>t.type==="expense")
+        .forEach(t=>{const k=t.category||"Outros";spent[k]=(spent[k]||0)+Number(t.amount||0)});
+      return spent;
+    },
+    render(){
+      const host=document.getElementById("budgetList");if(!host)return;
+      const budget=this.monthMap(selectedMonth),used=this.currentSpent(),prev=this.previousSpent();
+      const rows=categories.map(cat=>{
+        const limit=Number(budget[cat]||0),now=Number(used[cat]||0),before=Number(prev.spent[cat]||0);
+        const pct=limit?Math.min(now/limit*100,100):0,over=limit&&now>limit;
+        return '<div class="progress-row v27-budget-row">'+
+          '<div class="progress-head"><span><strong class="budget-cat-link" role="button" tabindex="0" data-cat="'+esc(cat)+'">'+esc(cat)+'</strong></span>'+
+          '<span class="privacy-value">'+money(now)+(limit?' / '+money(limit):' · sem limite')+'</span></div>'+
+          '<div class="v27-budget-meta">Gasto em '+esc(monthName(prev.month))+': <span class="privacy-value">'+money(before)+'</span></div>'+
+          '<div class="bar"><div class="'+(over?'over':'')+'" style="width:'+pct+'%"></div></div></div>';
+      });
+      host.innerHTML=rows.join("");
+      this.ensureHeader(prev.month);
+      applyPrivacyState?.();
+    },
+    ensureHeader(prevMonth){
+      const view=document.getElementById("budget");if(!view)return;
+      let box=document.getElementById("v27BudgetHeader");
+      if(!box){box=document.createElement("div");box.id="v27BudgetHeader";box.className="v27-budget-header";const list=document.getElementById("budgetList");list?.before(box)}
+      box.innerHTML='<div><strong>Planejamento de '+esc(monthName(selectedMonth))+'</strong><small>Use '+esc(monthName(prevMonth))+' como referência, sem alterar os lançamentos anteriores.</small></div>'+
+        '<button type="button" class="btn btn-small" id="v27CopyPrevious">Usar '+esc(monthName(prevMonth))+' como base</button>';
+      document.getElementById("v27CopyPrevious").onclick=()=>this.copyPrevious();
+    },
+    open(cat){
+      const sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount");
+      sel.innerHTML=categories.map(c=>'<option>'+esc(c)+'</option>').join("");
+      if(cat&&categories.includes(cat))sel.value=cat;
+      amount.value=this.monthMap(selectedMonth)[sel.value]||"";
+      let ref=document.getElementById("v27BudgetReference");
+      if(!ref){ref=document.createElement("div");ref.id="v27BudgetReference";ref.className="v27-budget-reference";amount.closest(".field").after(ref)}
+      const prev=this.previousSpent(),spent=Number(prev.spent[sel.value]||0);
+      ref.innerHTML='<strong>Referência:</strong> gasto em '+esc(monthName(prev.month))+' = <span class="privacy-value">'+money(spent)+'</span>';
+      document.getElementById("budgetBackdrop").classList.add("open");amount.focus();amount.select();applyPrivacyState?.();
+    },
+    save(e){
+      e.preventDefault();e.stopImmediatePropagation();
+      const cat=document.getElementById("bCategory").value,amount=Number(document.getElementById("bAmount").value)||0;
+      this.monthMap(selectedMonth,true)[cat]=amount;
+      closeBudgetModal();save();toast("Orçamento de "+monthName(selectedMonth)+" atualizado!");
+      setTimeout(()=>this.render(),0);
+    },
+    copyPrevious(){
+      const prev=this.previousSpent(),map=this.monthMap(selectedMonth,true);
+      categories.forEach(cat=>{map[cat]=Number(prev.spent[cat]||0)});
+      save();toast("Orçamento preenchido com os gastos de "+monthName(prev.month)+". Você pode ajustar categoria por categoria.");
+      setTimeout(()=>this.render(),0);
+    },
+    styles(){
+      const s=document.createElement("style");s.textContent=
+        ".v27-budget-header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;margin-bottom:14px;border:1px solid var(--border);border-radius:12px;background:var(--bg)}"+
+        ".v27-budget-header strong{display:block;font-size:13px}.v27-budget-header small{display:block;color:var(--muted);margin-top:4px;font-size:11px}"+
+        ".v27-budget-meta{font-size:11px;color:var(--muted);margin:-3px 0 8px}.v27-budget-reference{grid-column:1/-1;padding:10px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--border);font-size:12px;color:var(--muted)}"+
+        "@media(max-width:650px){.v27-budget-header{align-items:stretch;flex-direction:column}.v27-budget-header .btn{width:100%}.v27-budget-row .progress-head{align-items:flex-start;flex-direction:column}.v27-budget-row .progress-head span:last-child{text-align:left}}";
+      document.head.appendChild(s);
+    },
+    init(){
+      this.styles();
+      renderBudget=()=>this.render();
+      openBudgetModal=(cat)=>this.open(cat);window.openBudgetModal=openBudgetModal;
+      const form=document.getElementById("budgetForm");
+      form?.addEventListener("submit",e=>this.save(e),true);
+      const sel=document.getElementById("bCategory");
+      sel?.addEventListener("change",()=>setTimeout(()=>this.open(sel.value),0));
+      this.render();
+      document.getElementById("monthSelect")?.addEventListener("change",()=>setTimeout(()=>this.render(),60));
+      document.addEventListener("click",e=>{if(e.target.closest(".month-chip,.tab[data-view='budget']"))setTimeout(()=>this.render(),80)});
+    }
+  };
+  window.V27Budget=V27Budget;setTimeout(()=>V27Budget.init(),0);
+  /* /FINANCAS_V27_MONTHLY_BUDGETS */
+
 
 })();
 </script>
