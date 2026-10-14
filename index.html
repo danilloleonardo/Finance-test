@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.8.3 TEST</title>
+  <title>Finanças a Dois — V2.9 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -868,7 +868,7 @@
 </style>
 
   <style id="v281-public-dashboard">
-    /* V2.8.3 TEST — Dashboard enxuto para validação de produto final */
+    /* V2.9 TEST — Dashboard enxuto para validação de produto final */
     #dashboard{display:flex;flex-direction:column;gap:16px}
     #dashboard>.cards{order:1;margin:0!important}
     #dashboard>#cfoPanel{order:2;margin:0!important}
@@ -911,7 +911,7 @@
   </style>
 
   <style id="v282-page-navigation">
-    /* V2.8.3 TEST — navegação com sensação real de páginas */
+    /* V2.9 TEST — navegação com sensação real de páginas */
     .tabs{display:none!important}
     body:not(.view-dashboard) main>.ai-assistant,
     body:not(.view-dashboard) #dashboardMonths,
@@ -928,7 +928,7 @@
   </style>
 
   <style id="v283-strict-page-router">
-    /* V2.8.3 TEST — roteamento visual estrito: uma tela por vez */
+    /* V2.9 TEST — roteamento visual estrito: uma tela por vez */
     body.view-dashboard main>.view{display:none!important}
     body.view-dashboard main>#dashboard{display:block!important}
     body.view-transactions main>.view{display:none!important}
@@ -941,6 +941,25 @@
     body.view-goals main>#goals{display:block!important}
     body.view-wealth main>.view{display:none!important}
     body.view-wealth main>#wealth{display:block!important}
+  </style>
+
+  <style id="v29-dashboard-product">
+    /* V2.9 TEST — Dashboard orientado às três perguntas essenciais */
+    body.view-dashboard #dashboard>.v29-summary-cards{
+      grid-template-columns:repeat(3,minmax(0,1fr))!important;
+      gap:12px!important;
+    }
+    body.view-dashboard .v29-secondary-metric{display:none!important}
+    body.view-dashboard .v29-primary-metric{display:block!important;min-height:118px}
+    body.view-dashboard #v29AttentionValue{font-size:21px!important}
+    body.view-dashboard #dashboard>#cfoPanel{order:2}
+    body.view-dashboard #dashboard>.grid{order:3}
+    body.view-dashboard #dashboard>.card.section{order:4}
+    body.view-dashboard #cfoPanel .cfo-action #cfoNewTxBtn{display:none!important}
+    @media(max-width:900px){
+      body.view-dashboard #dashboard>.v29-summary-cards{grid-template-columns:1fr!important}
+      body.view-dashboard .v29-primary-metric{min-height:auto}
+    }
   </style>
 </head>
 
@@ -1156,26 +1175,36 @@
         </div>
       </div>
 
-      <div class="cards">
-        <div class="card metric">
+      <div class="cards v29-summary-cards">
+        <div class="card metric v29-secondary-metric">
           <div class="metric-label">Receitas</div>
           <div id="mIncome" class="metric-value privacy-value positive">R$ 0,00</div>
           <div class="metric-sub">Entradas no mês</div>
         </div>
-        <div class="card metric">
+        <div class="card metric v29-secondary-metric">
           <div class="metric-label">Despesas</div>
           <div id="mExpense" class="metric-value privacy-value negative">R$ 0,00</div>
           <div class="metric-sub">Saídas no mês</div>
         </div>
-        <div class="card metric">
-          <div class="metric-label">Saldo</div>
+        <div class="card metric v29-primary-metric">
+          <div class="metric-label">Quanto tenho no mês</div>
           <div id="mBalance" class="metric-value privacy-value">R$ 0,00</div>
           <div class="metric-sub">Receitas − despesas</div>
         </div>
-        <div class="card metric">
+        <div class="card metric v29-secondary-metric">
           <div class="metric-label">Taxa de economia</div>
           <div id="mRate" class="metric-value">0%</div>
           <div class="metric-sub">Quanto ficou no mês</div>
+        </div>
+        <div class="card metric v29-primary-metric">
+          <div class="metric-label">Quanto posso gastar</div>
+          <div id="v29BudgetAvailable" class="metric-value privacy-value">R$ 0,00</div>
+          <div id="v29BudgetAvailableSub" class="metric-sub">Disponível dentro do orçamento</div>
+        </div>
+        <div class="card metric v29-primary-metric">
+          <div class="metric-label">O que precisa de atenção</div>
+          <div id="v29AttentionValue" class="metric-value">Tudo certo</div>
+          <div id="v29AttentionSub" class="metric-sub">Nenhum alerta importante</div>
         </div>
       </div>
 
@@ -3963,6 +3992,44 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
   window.__financeNavigate=navigate;
   const initial=document.querySelector(".side-nav.active[data-view]")?.dataset.view||"dashboard";
   navigate(initial);
+})();
+</script>
+
+<script id="v29-dashboard-product-script">
+(function(){
+  function moneyV29(v){return new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v)||0)}
+  function refreshV29(){
+    try{
+      let budget=0,spent=0;
+      if(window.V27Budget){
+        const map=window.V27Budget.monthMap(selectedMonth)||{};
+        budget=Object.values(map).reduce((s,v)=>s+(Number(v)||0),0);
+        const used=window.V27Budget.spent(selectedMonth)||{};
+        spent=Object.values(used).reduce((s,v)=>s+(Number(v)||0),0);
+      }
+      const available=budget-spent;
+      const av=document.getElementById("v29BudgetAvailable");
+      const avs=document.getElementById("v29BudgetAvailableSub");
+      if(av){
+        av.textContent=budget>0?moneyV29(available):"—";
+        av.classList.toggle("negative",budget>0&&available<0);
+        av.classList.toggle("positive",budget>0&&available>=0);
+      }
+      if(avs)avs.textContent=budget>0?(available>=0?"Ainda disponível no orçamento":"Orçamento ultrapassado"):"Defina seus orçamentos por categoria";
+
+      const alerts=[...document.querySelectorAll("#cfoAlerts .cfo-alert")];
+      const critical=alerts.filter(x=>/acima|estour|ultrapass|atenção|limite/i.test(x.textContent||""));
+      const n=critical.length||alerts.length;
+      const val=document.getElementById("v29AttentionValue"),sub=document.getElementById("v29AttentionSub");
+      if(val){val.textContent=n?String(n)+" "+(n===1?"alerta":"alertas"):"Tudo certo";val.classList.toggle("negative",n>0);val.classList.toggle("positive",n===0)}
+      if(sub)sub.textContent=n?(n===1?"Há um ponto para revisar":"Há pontos para revisar"):"Nenhum alerta importante";
+    }catch(e){console.warn("V2.9 dashboard summary",e)}
+  }
+  const obs=new MutationObserver(()=>refreshV29());
+  const alerts=document.getElementById("cfoAlerts"); if(alerts)obs.observe(alerts,{childList:true,subtree:true,characterData:true});
+  document.getElementById("monthSelect")?.addEventListener("change",()=>setTimeout(refreshV29,180));
+  document.addEventListener("click",e=>{if(e.target.closest('[data-view="dashboard"],.month-chip'))setTimeout(refreshV29,180)});
+  setTimeout(refreshV29,350);setTimeout(refreshV29,1200);
 })();
 </script>
 </body>
