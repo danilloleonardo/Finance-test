@@ -1822,10 +1822,17 @@ Regras:
       setFirebaseStatus("✓ Dados sincronizados");
       setTimeout(()=>setFirebaseStatus(""),1800);
     }catch(err){
-      console.error(err);
+      console.error("Firebase load:", err);
       cloudReady = false;
-      setFirebaseStatus("Erro ao sincronizar. Verifique Firebase.");
-      toast("Erro ao carregar os dados da nuvem.");
+      // No ambiente de teste, falha de leitura da nuvem não deve gerar dois alertas
+      // nem sugerir que os dados locais deixaram de estar disponíveis.
+      if(typeof TEST_READ_ONLY!=="undefined" && TEST_READ_ONLY){
+        setFirebaseStatus("TESTE · dados locais disponíveis · nuvem indisponível");
+      }else{
+        setFirebaseStatus("Erro ao sincronizar. Verifique Firebase.");
+        toast("Erro ao carregar os dados da nuvem.");
+      }
+      render();
     }finally{
       loadingCloud = false;
     }
