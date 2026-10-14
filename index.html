@@ -983,7 +983,25 @@
     .toolbar .actions button[onclick="openCameraImport()"]::after{content:"📷";font-size:15px}
   }
 </style>
-</head>
+
+<style id="v30-dashboard-accordion">
+  /* V3.0 TEST — dashboard principal visível; análises sob demanda */
+  body.view-dashboard #dashboard>.v29-summary-cards{order:1!important}
+  body.view-dashboard #dashboard>.grid{order:2!important}
+  body.view-dashboard #v171Attention{order:3!important}
+  body.view-dashboard #v26MonthlyClose{order:4!important}
+  body.view-dashboard #cfoPanel{order:5!important}
+  body.view-dashboard #dashboard>.card.section:not(#v171Attention):not(#v26MonthlyClose){order:6}
+  .dash-collapsible{padding:0!important;overflow:hidden}
+  .dash-collapsible>.dash-collapse-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;cursor:pointer;user-select:none}
+  .dash-collapsible>.dash-collapse-head h3{margin:0;font-size:15px}
+  .dash-collapsible>.dash-collapse-head .dash-chevron{transition:transform .2s ease;font-size:18px;color:var(--muted)}
+  .dash-collapsible>.dash-collapse-body{display:none;padding:0 18px 18px}
+  .dash-collapsible.is-open>.dash-collapse-body{display:block}
+  .dash-collapsible.is-open>.dash-collapse-head .dash-chevron{transform:rotate(90deg)}
+  #cfoPanel.dash-collapsible .cfo-hero,#cfoPanel.dash-collapsible .cfo-body{display:none!important}
+  #cfoPanel.dash-collapsible.is-open .cfo-hero,#cfoPanel.dash-collapsible.is-open .cfo-body{display:block!important}
+</style></head>
 
 <body>
 
@@ -4059,5 +4077,39 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
   setTimeout(refreshV29,350);setTimeout(refreshV29,1200);
 })();
 </script>
-</body>
+
+<script id="v30-dashboard-accordion-script">
+(function(){
+  function wrapCard(el,title){
+    if(!el||el.dataset.collapsibleReady==="1")return;
+    el.dataset.collapsibleReady="1";
+    el.classList.add("dash-collapsible");
+    const children=[...el.childNodes];
+    const body=document.createElement("div"); body.className="dash-collapse-body";
+    children.forEach(n=>body.appendChild(n));
+    const head=document.createElement("div"); head.className="dash-collapse-head"; head.setAttribute("role","button");head.tabIndex=0;
+    head.innerHTML='<h3>'+title+'</h3><span class="dash-chevron">›</span>';
+    el.append(head,body);
+    const toggle=()=>el.classList.toggle("is-open");
+    head.addEventListener("click",toggle);head.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle()}});
+  }
+  function prepare(){
+    wrapCard(document.getElementById("v171Attention"),"⚠️ Atenção este mês");
+    const close=document.getElementById("v26MonthlyClose");
+    if(close)wrapCard(close,"Fechamento mensal e Leitura CFO");
+    const cfo=document.getElementById("cfoPanel");
+    if(cfo&&!cfo.dataset.collapsibleReady){
+      cfo.dataset.collapsibleReady="1";cfo.classList.add("dash-collapsible");
+      const head=document.createElement("div");head.className="dash-collapse-head";head.setAttribute("role","button");head.tabIndex=0;
+      head.innerHTML='<h3>✨ Resumo inteligente</h3><span class="dash-chevron">›</span>';
+      cfo.prepend(head);
+      const toggle=()=>cfo.classList.toggle("is-open");
+      head.addEventListener("click",toggle);head.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle()}});
+    }
+  }
+  const dash=document.getElementById("dashboard");
+  if(dash)new MutationObserver(()=>prepare()).observe(dash,{childList:true});
+  setTimeout(prepare,250);setTimeout(prepare,1200);
+})();
+</script></body>
 </html>
