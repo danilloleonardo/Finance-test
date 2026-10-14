@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.8.0 TEST</title>
+  <title>Finanças a Dois — V2.8.1 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -866,6 +866,49 @@
 @media(max-width:480px){.v26-grid{grid-template-columns:1fr}}
 /* /FINANCAS_V26_ROADMAP */
 </style>
+
+  <style id="v281-public-dashboard">
+    /* V2.8.1 TEST — Dashboard enxuto para validação de produto final */
+    #dashboard{display:flex;flex-direction:column;gap:16px}
+    #dashboard>.cards{order:1;margin:0!important}
+    #dashboard>#cfoPanel{order:2;margin:0!important}
+    #dashboard>.grid{order:3;margin:0!important}
+    #dashboard>.card.section{order:4;margin:0!important}
+
+    /* Evita duplicidade: os KPIs principais já existem nos quatro cards superiores. */
+    #cfoPanel .cfo-grid{display:none!important}
+    #cfoPanel .cfo-body{padding:14px 18px!important}
+    #cfoPanel .cfo-hero{padding:16px 18px!important}
+    #cfoPanel .cfo-head h3{font-size:15px!important}
+    #cfoPanel .cfo-head p{margin-top:3px!important}
+    #cfoPanel .cfo-columns{display:block!important}
+    #cfoPanel .cfo-columns>.cfo-box:first-child{border:0!important;background:transparent!important;padding:0!important}
+    #cfoPanel .cfo-columns>.cfo-box:nth-child(2),
+    #cfoPanel .cfo-body>.cfo-box{display:none!important}
+    #cfoPanel .cfo-alert{padding:9px 0!important}
+    #cfoPanel .cfo-action{margin-top:10px!important}
+    #cfoPanel .cfo-action #cfoBudgetBtn{display:none!important}
+
+    #dashboard>.cards{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}
+    #dashboard>.grid{grid-template-columns:1.15fr .85fr!important}
+    #dashboard .section{padding:17px!important}
+    #dashboard .metric{min-height:112px}
+    #dashboard .metric-value{font-size:25px!important}
+
+    @media(max-width:900px){
+      #dashboard>.cards{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      #dashboard>.grid{grid-template-columns:1fr!important}
+    }
+    @media(max-width:560px){
+      #dashboard{gap:12px}
+      #dashboard>.cards{grid-template-columns:1fr 1fr!important;gap:8px!important}
+      #dashboard .metric{padding:14px!important;min-height:100px}
+      #dashboard .metric-value{font-size:20px!important}
+      #cfoPanel .cfo-hero,#cfoPanel .cfo-body{padding:14px!important}
+      #cfoPanel .cfo-head{gap:10px}
+      #cfoPanel .cfo-head button{font-size:10px;padding:8px 10px}
+    }
+  </style>
 </head>
 
 <body>
@@ -1045,10 +1088,10 @@
         <div class="cfo-hero">
           <div class="cfo-head">
             <div>
-              <h3>🤖 CFO da Família</h3>
-              <p id="cfoHeadline">Análise automática do seu mês.</p>
+              <h3>Resumo inteligente</h3>
+              <p id="cfoHeadline">Os principais pontos do seu mês, em um só lugar.</p>
             </div>
-            <button id="cfoAiBtn" class="btn" type="button" style="background:#fff;color:#04344C;border:0">✨ Analisar com IA</button>
+            <button id="cfoAiBtn" class="btn" type="button" style="background:#fff;color:#04344C;border:0">Analisar com IA</button>
           </div>
           <div class="cfo-grid">
             <div class="cfo-kpi"><div class="cfo-kpi-label">Saldo atual</div><div id="cfoBalance" class="cfo-kpi-value privacy-value">R$ 0,00</div><div class="cfo-kpi-sub">Receitas − despesas</div></div>
