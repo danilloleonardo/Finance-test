@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V3.2 TEST</title>
+  <title>Finanças a Dois — V3.3 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -868,7 +868,7 @@
 </style>
 
   <style id="v281-public-dashboard">
-    /* V3.2 TEST — Dashboard enxuto para validação de produto final */
+    /* V3.3 TEST — Dashboard enxuto para validação de produto final */
     #dashboard{display:flex;flex-direction:column;gap:16px}
     #dashboard>.cards{order:1;margin:0!important}
     #dashboard>#cfoPanel{order:2;margin:0!important}
@@ -911,7 +911,7 @@
   </style>
 
   <style id="v282-page-navigation">
-    /* V3.2 TEST — navegação com sensação real de páginas */
+    /* V3.3 TEST — navegação com sensação real de páginas */
     .tabs{display:none!important}
     body:not(.view-dashboard) main>.ai-assistant,
     body:not(.view-dashboard) #dashboardMonths,
@@ -928,7 +928,7 @@
   </style>
 
   <style id="v283-strict-page-router">
-    /* V3.2 TEST — roteamento visual estrito: uma tela por vez */
+    /* V3.3 TEST — roteamento visual estrito: uma tela por vez */
     body.view-dashboard main>.view{display:none!important}
     body.view-dashboard main>#dashboard{display:block!important}
     body.view-transactions main>.view{display:none!important}
@@ -944,7 +944,7 @@
   </style>
 
   <style id="v29-dashboard-product">
-    /* V3.2 TEST — Dashboard orientado às três perguntas essenciais */
+    /* V3.3 TEST — Dashboard orientado às três perguntas essenciais */
     body.view-dashboard #dashboard>.v29-summary-cards{
       grid-template-columns:repeat(4,minmax(0,1fr))!important;
       gap:12px!important;
@@ -971,7 +971,7 @@
   </style>
 
 <style id="v30-dashboard-top-and-receipt">
-  /* V3.2 TEST — KPIs primeiro + comprovante como ação independente */
+  /* V3.3 TEST — KPIs primeiro + comprovante como ação independente */
   body.view-dashboard #dashboard>.v29-summary-cards{order:1!important}
   body.view-dashboard #dashboard>#cfoPanel{order:2!important}
   body.view-dashboard #dashboard>.grid{order:3!important}
@@ -985,7 +985,7 @@
 </style>
 
 <style id="v30-dashboard-accordion">
-  /* V3.2 TEST — dashboard principal visível; análises sob demanda */
+  /* V3.3 TEST — dashboard principal visível; análises sob demanda */
   body.view-dashboard #dashboard>.v29-summary-cards{order:1!important}
   body.view-dashboard #dashboard>.grid{order:2!important}
   body.view-dashboard #v171Attention{order:3!important}
@@ -1048,6 +1048,46 @@
   @media(max-width:600px){
     #v32AiFab{right:16px;bottom:18px;width:56px;height:56px}
     #v32AiPanel{left:12px;right:12px;bottom:84px;width:auto;max-height:72vh}
+  }
+</style>
+<style id="v33-mobile-and-accordion">
+  /* V3.3 TEST — cabeçalhos uniformes + experiência mobile */
+  body.view-dashboard .dash-collapsible>.dash-collapse-head,
+  body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
+    min-height:50px!important;height:50px!important;padding:0 18px!important;
+    display:flex!important;align-items:center!important;box-sizing:border-box!important
+  }
+  body.view-dashboard .dash-collapsible>.dash-collapse-head h3,
+  body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head h3{
+    font-size:14px!important;line-height:1.2!important;margin:0!important
+  }
+  body.view-dashboard .dash-collapsible{border-radius:14px!important}
+  @media(max-width:760px){
+    main{padding-left:14px!important;padding-right:14px!important}
+    .toolbar{gap:10px!important}
+    .toolbar .actions{display:grid!important;grid-template-columns:1fr 1fr!important;width:100%;gap:8px!important}
+    .toolbar .actions .btn{width:100%;min-height:44px;justify-content:center}
+    body.view-dashboard #dashboard>.v29-summary-cards{grid-template-columns:1fr 1fr!important;gap:8px!important}
+    body.view-dashboard #dashboard>.v29-summary-cards .metric{padding:13px!important;min-height:96px!important}
+    body.view-dashboard #dashboard>.v29-summary-cards .metric-value{font-size:19px!important}
+    body.view-dashboard #dashboard>.grid{gap:10px!important}
+    .month-chips{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:none;padding-bottom:3px}
+    .month-chips::-webkit-scrollbar{display:none}
+    .month-chip{flex:0 0 auto;min-height:40px}
+    .dash-collapsible>.dash-collapse-head{min-height:48px!important;height:48px!important;padding:0 14px!important}
+    #v32AiFab{width:58px!important;height:58px!important;bottom:max(18px,env(safe-area-inset-bottom))!important}
+    #v32AiPanel{bottom:calc(86px + env(safe-area-inset-bottom))!important;max-height:70dvh!important}
+    #v32AiPanel .ai-row{display:grid!important;grid-template-columns:1fr 48px!important}
+    #v32AiPanel .ai-send{grid-column:1/-1;width:100%}
+    #v32AiPanel .ai-preview-grid{grid-template-columns:1fr 1fr!important}
+    .modal{max-height:88dvh!important}
+  }
+  @media(max-width:420px){
+    main{padding-left:10px!important;padding-right:10px!important}
+    .toolbar .actions{grid-template-columns:1fr!important}
+    body.view-dashboard #dashboard>.v29-summary-cards{grid-template-columns:1fr 1fr!important}
+    body.view-dashboard #dashboard>.v29-summary-cards .metric-label{font-size:9px!important}
+    body.view-dashboard #dashboard>.v29-summary-cards .metric-value{font-size:17px!important}
   }
 </style></head>
 
