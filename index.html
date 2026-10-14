@@ -1196,6 +1196,31 @@ body.view-dashboard #cfoPanel .dash-collapse-chevron{
  }
 }
 </style>
+
+<style id="v36-dashboard-accordion-padding-fix">
+/* Corrige o recuo extra herdado de .section em Atenção e Fechamento */
+body.view-dashboard #v171Attention.dash-collapsible,
+body.view-dashboard #v26Closing.dash-collapsible{
+  padding:0!important;
+}
+body.view-dashboard #v171Attention.dash-collapsible>.dash-collapse-body,
+body.view-dashboard #v26Closing.dash-collapsible>.dash-collapse-body{
+  padding:16px 18px 18px!important;
+  box-sizing:border-box!important;
+}
+body.view-dashboard #v171Attention.dash-collapsible>.dash-collapse-head,
+body.view-dashboard #v26Closing.dash-collapsible>.dash-collapse-head,
+body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
+  padding-left:18px!important;padding-right:44px!important;
+}
+@media(max-width:760px){
+ body.view-dashboard #v171Attention.dash-collapsible>.dash-collapse-body,
+ body.view-dashboard #v26Closing.dash-collapsible>.dash-collapse-body{padding:14px!important}
+ body.view-dashboard #v171Attention.dash-collapsible>.dash-collapse-head,
+ body.view-dashboard #v26Closing.dash-collapsible>.dash-collapse-head,
+ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{padding-left:14px!important;padding-right:40px!important}
+}
+</style>
 </head>
 
 <body>
