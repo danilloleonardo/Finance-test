@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.8.2 TEST</title>
+  <title>Finanças a Dois — V2.8.3 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -868,7 +868,7 @@
 </style>
 
   <style id="v281-public-dashboard">
-    /* V2.8.2 TEST — Dashboard enxuto para validação de produto final */
+    /* V2.8.3 TEST — Dashboard enxuto para validação de produto final */
     #dashboard{display:flex;flex-direction:column;gap:16px}
     #dashboard>.cards{order:1;margin:0!important}
     #dashboard>#cfoPanel{order:2;margin:0!important}
@@ -911,7 +911,7 @@
   </style>
 
   <style id="v282-page-navigation">
-    /* V2.8.2 TEST — navegação com sensação real de páginas */
+    /* V2.8.3 TEST — navegação com sensação real de páginas */
     .tabs{display:none!important}
     body:not(.view-dashboard) main>.ai-assistant,
     body:not(.view-dashboard) #dashboardMonths,
@@ -925,6 +925,22 @@
       body:not(.view-dashboard) main{padding-top:16px!important}
       body:not(.view-dashboard) .toolbar h2{font-size:22px!important}
     }
+  </style>
+
+  <style id="v283-strict-page-router">
+    /* V2.8.3 TEST — roteamento visual estrito: uma tela por vez */
+    body.view-dashboard main>.view{display:none!important}
+    body.view-dashboard main>#dashboard{display:block!important}
+    body.view-transactions main>.view{display:none!important}
+    body.view-transactions main>#transactions{display:block!important}
+    body.view-creditcard main>.view{display:none!important}
+    body.view-creditcard main>#creditcard{display:block!important}
+    body.view-budget main>.view{display:none!important}
+    body.view-budget main>#budget{display:block!important}
+    body.view-goals main>.view{display:none!important}
+    body.view-goals main>#goals{display:block!important}
+    body.view-wealth main>.view{display:none!important}
+    body.view-wealth main>#wealth{display:block!important}
   </style>
 </head>
 
@@ -3923,6 +3939,30 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
     });
   });
   setPageContext(document.querySelector(".tab.active")?.dataset.view||"dashboard");
+})();
+</script>
+
+<script id="v283-strict-page-router-script">
+(function(){
+  const titles={dashboard:"Visão geral",transactions:"Lançamentos",creditcard:"Cartão de crédito",budget:"Orçamento",goals:"Metas",wealth:"Patrimônio"};
+  function navigate(view){
+    if(!titles[view])view="dashboard";
+    ["dashboard","transactions","creditcard","budget","goals","wealth"].forEach(v=>{
+      document.body.classList.toggle("view-"+v,v===view);
+      document.getElementById(v)?.classList.toggle("active",v===view);
+    });
+    document.querySelectorAll(".tab[data-view]").forEach(x=>x.classList.toggle("active",x.dataset.view===view));
+    document.querySelectorAll(".side-nav[data-view]").forEach(x=>x.classList.toggle("active",x.dataset.view===view));
+    const title=document.getElementById("pageTitle"); if(title)title.textContent=titles[view];
+    if(view==="creditcard"&&typeof renderCreditCard==="function")renderCreditCard();
+    window.scrollTo({top:0,left:0,behavior:"auto"});
+  }
+  document.querySelectorAll(".side-nav[data-view]").forEach(btn=>{
+    btn.addEventListener("click",e=>{e.preventDefault();e.stopImmediatePropagation();navigate(btn.dataset.view)},true);
+  });
+  window.__financeNavigate=navigate;
+  const initial=document.querySelector(".side-nav.active[data-view]")?.dataset.view||"dashboard";
+  navigate(initial);
 })();
 </script>
 </body>
