@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.8.1 TEST</title>
+  <title>Finanças a Dois — V2.8.2 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -868,7 +868,7 @@
 </style>
 
   <style id="v281-public-dashboard">
-    /* V2.8.1 TEST — Dashboard enxuto para validação de produto final */
+    /* V2.8.2 TEST — Dashboard enxuto para validação de produto final */
     #dashboard{display:flex;flex-direction:column;gap:16px}
     #dashboard>.cards{order:1;margin:0!important}
     #dashboard>#cfoPanel{order:2;margin:0!important}
@@ -907,6 +907,23 @@
       #cfoPanel .cfo-hero,#cfoPanel .cfo-body{padding:14px!important}
       #cfoPanel .cfo-head{gap:10px}
       #cfoPanel .cfo-head button{font-size:10px;padding:8px 10px}
+    }
+  </style>
+
+  <style id="v282-page-navigation">
+    /* V2.8.2 TEST — navegação com sensação real de páginas */
+    .tabs{display:none!important}
+    body:not(.view-dashboard) main>.ai-assistant,
+    body:not(.view-dashboard) #dashboardMonths,
+    body:not(.view-dashboard) .welcome{display:none!important}
+    body:not(.view-dashboard) main{padding-top:26px!important}
+    body:not(.view-dashboard) .toolbar{margin-bottom:22px!important}
+    body:not(.view-dashboard) .toolbar h2{font-size:28px!important;margin-bottom:4px!important}
+    body:not(.view-dashboard) .toolbar #monthLabel + p{display:none!important}
+    body.view-dashboard .toolbar{margin-bottom:18px!important}
+    @media(max-width:760px){
+      body:not(.view-dashboard) main{padding-top:16px!important}
+      body:not(.view-dashboard) .toolbar h2{font-size:22px!important}
     }
   </style>
 </head>
@@ -3888,5 +3905,25 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
 })();
 </script>
 
+
+<script id="v282-page-navigation-script">
+(function(){
+  const names={dashboard:"dashboard",transactions:"transactions",creditcard:"creditcard",budget:"budget",goals:"goals",wealth:"wealth"};
+  function setPageContext(view){
+    Object.values(names).forEach(v=>document.body.classList.remove("view-"+v));
+    document.body.classList.add("view-"+(names[view]||"dashboard"));
+  }
+  document.querySelectorAll(".tab[data-view]").forEach(tab=>{
+    tab.addEventListener("click",()=>setPageContext(tab.dataset.view));
+  });
+  document.querySelectorAll(".side-nav[data-view]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      setPageContext(btn.dataset.view);
+      requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:"auto"}));
+    });
+  });
+  setPageContext(document.querySelector(".tab.active")?.dataset.view||"dashboard");
+})();
+</script>
 </body>
 </html>
