@@ -946,19 +946,27 @@
   <style id="v29-dashboard-product">
     /* V2.9 TEST — Dashboard orientado às três perguntas essenciais */
     body.view-dashboard #dashboard>.v29-summary-cards{
-      grid-template-columns:repeat(3,minmax(0,1fr))!important;
+      grid-template-columns:repeat(4,minmax(0,1fr))!important;
       gap:12px!important;
     }
-    body.view-dashboard .v29-secondary-metric{display:none!important}
-    body.view-dashboard .v29-primary-metric{display:block!important;min-height:118px}
+    body.view-dashboard .v29-secondary-metric{display:block!important}
+    body.view-dashboard .v29-primary-metric{display:block!important;min-height:112px}
+    body.view-dashboard #v29BudgetAvailable,
+    body.view-dashboard #v29BudgetAvailableSub,
+    body.view-dashboard #v29AttentionValue,
+    body.view-dashboard #v29AttentionSub{display:none!important}
+    body.view-dashboard .v29-summary-cards>.v29-primary-metric:nth-last-child(-n+2){display:none!important}
     body.view-dashboard #v29AttentionValue{font-size:21px!important}
     body.view-dashboard #dashboard>#cfoPanel{order:2}
     body.view-dashboard #dashboard>.grid{order:3}
     body.view-dashboard #dashboard>.card.section{order:4}
     body.view-dashboard #cfoPanel .cfo-action #cfoNewTxBtn{display:none!important}
     @media(max-width:900px){
-      body.view-dashboard #dashboard>.v29-summary-cards{grid-template-columns:1fr!important}
+      body.view-dashboard #dashboard>.v29-summary-cards{grid-template-columns:repeat(2,minmax(0,1fr))!important}
       body.view-dashboard .v29-primary-metric{min-height:auto}
+    }
+    @media(max-width:520px){
+      body.view-dashboard #dashboard>.v29-summary-cards{grid-template-columns:1fr 1fr!important}
     }
   </style>
 </head>
