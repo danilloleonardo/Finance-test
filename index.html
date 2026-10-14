@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V3.3 TEST</title>
+  <title>Finanças a Dois — V3.4 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -868,7 +868,7 @@
 </style>
 
   <style id="v281-public-dashboard">
-    /* V3.3 TEST — Dashboard enxuto para validação de produto final */
+    /* V3.4 TEST — Dashboard enxuto para validação de produto final */
     #dashboard{display:flex;flex-direction:column;gap:16px}
     #dashboard>.cards{order:1;margin:0!important}
     #dashboard>#cfoPanel{order:2;margin:0!important}
@@ -911,7 +911,7 @@
   </style>
 
   <style id="v282-page-navigation">
-    /* V3.3 TEST — navegação com sensação real de páginas */
+    /* V3.4 TEST — navegação com sensação real de páginas */
     .tabs{display:none!important}
     body:not(.view-dashboard) main>.ai-assistant,
     body:not(.view-dashboard) #dashboardMonths,
@@ -928,7 +928,7 @@
   </style>
 
   <style id="v283-strict-page-router">
-    /* V3.3 TEST — roteamento visual estrito: uma tela por vez */
+    /* V3.4 TEST — roteamento visual estrito: uma tela por vez */
     body.view-dashboard main>.view{display:none!important}
     body.view-dashboard main>#dashboard{display:block!important}
     body.view-transactions main>.view{display:none!important}
@@ -944,7 +944,7 @@
   </style>
 
   <style id="v29-dashboard-product">
-    /* V3.3 TEST — Dashboard orientado às três perguntas essenciais */
+    /* V3.4 TEST — Dashboard orientado às três perguntas essenciais */
     body.view-dashboard #dashboard>.v29-summary-cards{
       grid-template-columns:repeat(4,minmax(0,1fr))!important;
       gap:12px!important;
@@ -971,7 +971,7 @@
   </style>
 
 <style id="v30-dashboard-top-and-receipt">
-  /* V3.3 TEST — KPIs primeiro + comprovante como ação independente */
+  /* V3.4 TEST — KPIs primeiro + comprovante como ação independente */
   body.view-dashboard #dashboard>.v29-summary-cards{order:1!important}
   body.view-dashboard #dashboard>#cfoPanel{order:2!important}
   body.view-dashboard #dashboard>.grid{order:3!important}
@@ -985,7 +985,7 @@
 </style>
 
 <style id="v30-dashboard-accordion">
-  /* V3.3 TEST — dashboard principal visível; análises sob demanda */
+  /* V3.4 TEST — dashboard principal visível; análises sob demanda */
   body.view-dashboard #dashboard>.v29-summary-cards{order:1!important}
   body.view-dashboard #dashboard>.grid{order:2!important}
   body.view-dashboard #v171Attention{order:3!important}
@@ -1051,7 +1051,7 @@
   }
 </style>
 <style id="v33-mobile-and-accordion">
-  /* V3.3 TEST — cabeçalhos uniformes + experiência mobile */
+  /* V3.4 TEST — cabeçalhos uniformes + experiência mobile */
   body.view-dashboard .dash-collapsible>.dash-collapse-head,
   body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
     min-height:50px!important;height:50px!important;padding:0 18px!important;
@@ -1088,6 +1088,42 @@
     body.view-dashboard #dashboard>.v29-summary-cards{grid-template-columns:1fr 1fr!important}
     body.view-dashboard #dashboard>.v29-summary-cards .metric-label{font-size:9px!important}
     body.view-dashboard #dashboard>.v29-summary-cards .metric-value{font-size:17px!important}
+  }
+</style>
+<style id="v34-public-readiness">
+  /* V3.4 TEST — acabamento final para validação pública */
+  body.view-dashboard .dash-collapsible>.dash-collapse-head,
+  body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
+    height:52px!important;min-height:52px!important;max-height:52px!important;
+    padding:0 18px!important;margin:0!important;box-sizing:border-box!important;
+    display:flex!important;align-items:center!important;justify-content:space-between!important
+  }
+  body.view-dashboard .dash-collapsible>.dash-collapse-head h3,
+  body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head h3{
+    margin:0!important;padding:0!important;font-size:14px!important;line-height:1!important
+  }
+  body.view-dashboard .dash-collapsible:not(.is-open){min-height:52px!important;height:52px!important}
+  body.view-dashboard .dash-collapsible:not(.is-open)>.dash-collapse-body{display:none!important}
+  body.view-dashboard #cfoPanel.dash-collapsible:not(.is-open){min-height:52px!important;height:52px!important}
+  body.view-dashboard #v171Attention,
+  body.view-dashboard #v26Closing,
+  body.view-dashboard #cfoPanel{margin:0!important}
+  body.view-dashboard #dashboard{gap:10px!important}
+
+  /* Estados de foco visíveis para teclado/acessibilidade */
+  button:focus-visible,[role="button"]:focus-visible,input:focus-visible,select:focus-visible{
+    outline:2px solid var(--teal-500,#00c7a5)!important;outline-offset:2px!important
+  }
+  /* Evita conteúdo financeiro vazando horizontalmente em telas pequenas */
+  .view,.card,.section{min-width:0}
+  @media(max-width:760px){
+    body.view-dashboard .dash-collapsible>.dash-collapse-head,
+    body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
+      height:50px!important;min-height:50px!important;max-height:50px!important;padding:0 14px!important
+    }
+    body.view-dashboard .dash-collapsible:not(.is-open),
+    body.view-dashboard #cfoPanel.dash-collapsible:not(.is-open){height:50px!important;min-height:50px!important}
+    .privacy-value{max-width:100%;overflow-wrap:anywhere}
   }
 </style></head>
 
@@ -4259,6 +4295,26 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
     if(mic)new MutationObserver(()=>fab.classList.toggle("listening",mic.classList.contains("listening"))).observe(mic,{attributes:true,attributeFilter:["class"]});
   }
   setTimeout(install,100);setTimeout(install,700);
+})();
+</script>
+<script id="v34-public-readiness-script">
+(function(){
+  function hardenUI(){
+    document.querySelectorAll(".dash-collapse-head").forEach(h=>{
+      h.setAttribute("aria-expanded",h.parentElement?.classList.contains("is-open")?"true":"false");
+      if(h.dataset.v34)return;h.dataset.v34="1";
+      h.addEventListener("click",()=>requestAnimationFrame(()=>h.setAttribute("aria-expanded",h.parentElement?.classList.contains("is-open")?"true":"false")));
+      h.addEventListener("keydown",()=>requestAnimationFrame(()=>h.setAttribute("aria-expanded",h.parentElement?.classList.contains("is-open")?"true":"false")));
+    });
+    const fab=document.getElementById("v32AiFab");
+    const panel=document.getElementById("v32AiPanel");
+    if(fab&&panel&&!fab.dataset.v34){fab.dataset.v34="1";fab.setAttribute("aria-controls","v32AiPanel");fab.setAttribute("aria-expanded","false");
+      new MutationObserver(()=>fab.setAttribute("aria-expanded",panel.classList.contains("open")?"true":"false")).observe(panel,{attributes:true,attributeFilter:["class"]});
+    }
+  }
+  const root=document.getElementById("dashboard");
+  if(root)new MutationObserver(()=>queueMicrotask(hardenUI)).observe(root,{childList:true,subtree:true});
+  setTimeout(hardenUI,200);setTimeout(hardenUI,1200);
 })();
 </script></body>
 </html>
