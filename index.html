@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V3.0 TEST</title>
+  <title>Finanças a Dois — V3.2 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -868,7 +868,7 @@
 </style>
 
   <style id="v281-public-dashboard">
-    /* V3.0 TEST — Dashboard enxuto para validação de produto final */
+    /* V3.2 TEST — Dashboard enxuto para validação de produto final */
     #dashboard{display:flex;flex-direction:column;gap:16px}
     #dashboard>.cards{order:1;margin:0!important}
     #dashboard>#cfoPanel{order:2;margin:0!important}
@@ -911,7 +911,7 @@
   </style>
 
   <style id="v282-page-navigation">
-    /* V3.0 TEST — navegação com sensação real de páginas */
+    /* V3.2 TEST — navegação com sensação real de páginas */
     .tabs{display:none!important}
     body:not(.view-dashboard) main>.ai-assistant,
     body:not(.view-dashboard) #dashboardMonths,
@@ -928,7 +928,7 @@
   </style>
 
   <style id="v283-strict-page-router">
-    /* V3.0 TEST — roteamento visual estrito: uma tela por vez */
+    /* V3.2 TEST — roteamento visual estrito: uma tela por vez */
     body.view-dashboard main>.view{display:none!important}
     body.view-dashboard main>#dashboard{display:block!important}
     body.view-transactions main>.view{display:none!important}
@@ -944,7 +944,7 @@
   </style>
 
   <style id="v29-dashboard-product">
-    /* V3.0 TEST — Dashboard orientado às três perguntas essenciais */
+    /* V3.2 TEST — Dashboard orientado às três perguntas essenciais */
     body.view-dashboard #dashboard>.v29-summary-cards{
       grid-template-columns:repeat(4,minmax(0,1fr))!important;
       gap:12px!important;
@@ -971,7 +971,7 @@
   </style>
 
 <style id="v30-dashboard-top-and-receipt">
-  /* V3.0 TEST — KPIs primeiro + comprovante como ação independente */
+  /* V3.2 TEST — KPIs primeiro + comprovante como ação independente */
   body.view-dashboard #dashboard>.v29-summary-cards{order:1!important}
   body.view-dashboard #dashboard>#cfoPanel{order:2!important}
   body.view-dashboard #dashboard>.grid{order:3!important}
@@ -985,7 +985,7 @@
 </style>
 
 <style id="v30-dashboard-accordion">
-  /* V3.0 TEST — dashboard principal visível; análises sob demanda */
+  /* V3.2 TEST — dashboard principal visível; análises sob demanda */
   body.view-dashboard #dashboard>.v29-summary-cards{order:1!important}
   body.view-dashboard #dashboard>.grid{order:2!important}
   body.view-dashboard #v171Attention{order:3!important}
@@ -1001,6 +1001,29 @@
   .dash-collapsible.is-open>.dash-collapse-head .dash-chevron{transform:rotate(90deg)}
   #cfoPanel.dash-collapsible .cfo-hero,#cfoPanel.dash-collapsible .cfo-body{display:none!important}
   #cfoPanel.dash-collapsible.is-open .cfo-hero,#cfoPanel.dash-collapsible.is-open .cfo-body{display:block!important}
+</style>
+<style id="v31-v32-product">
+  /* V3.1 — orçamento visual */
+  .v31-budget-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 18px}
+  .v31-budget-kpi{padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--bg)}
+  .v31-budget-kpi small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.45px;font-weight:800;margin-bottom:6px}
+  .v31-budget-kpi strong{font-family:var(--font-display);font-size:20px}
+  .v31-budget-status{margin:0 0 14px;padding:11px 13px;border:1px solid var(--border);border-radius:12px;font-size:12px}
+  .v27-budget-row{padding:10px 0}
+  .v27-budget-row .bar{height:8px}
+  /* V3.2 — assistente discreto e acionável */
+  .ai-assistant{padding:0!important;overflow:hidden}
+  .ai-assistant>.section-title{margin:0!important;padding:14px 16px;cursor:pointer;align-items:center}
+  .ai-assistant>.section-title::after{content:"›";font-size:20px;margin-left:8px;transition:transform .2s}
+  .ai-assistant.ai-open>.section-title::after{transform:rotate(90deg)}
+  .ai-assistant:not(.ai-open)>:not(.section-title){display:none!important}
+  .ai-assistant.ai-open{padding-bottom:16px!important}
+  .ai-assistant.ai-open>.ai-assistant-sub,.ai-assistant.ai-open>.ai-row,.ai-assistant.ai-open>.ai-status,.ai-assistant.ai-open>.ai-answer,.ai-assistant.ai-open>.ai-preview,.ai-assistant.ai-open>.ai-examples{margin-left:16px;margin-right:16px}
+  .ai-assistant .section-title span{font-size:9px;opacity:.7}
+  @media(max-width:700px){
+    .v31-budget-summary{grid-template-columns:1fr}
+    .ai-assistant .section-title span{display:none}
+  }
 </style></head>
 
 <body>
@@ -1340,7 +1363,7 @@
           <h3>Orçamento por categoria</h3>
           <button class="btn btn-primary btn-small" onclick="openBudgetModal()">Definir orçamento</button>
         </div>
-        <div id="budgetList"></div>
+        <div id="v31BudgetSummary" class="v31-budget-summary"></div><div id="budgetList"></div>
       </div>
     </section>
 
@@ -4109,6 +4132,45 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
   const dash=document.getElementById("dashboard");
   if(dash)new MutationObserver(()=>queueMicrotask(prepare)).observe(dash,{childList:true,subtree:true});
   setTimeout(prepare,100);setTimeout(prepare,500);setTimeout(prepare,1500);
+})();
+</script>
+<script id="v31-v32-product-script">
+(function(){
+  function budgetSummary(){
+    const host=document.getElementById("v31BudgetSummary");if(!host||!window.V27Budget)return;
+    const map=V27Budget.monthMap(selectedMonth)||{},used=V27Budget.currentSpent?V27Budget.currentSpent():V27Budget.spent?.(selectedMonth)||{};
+    const planned=Object.values(map).reduce((s,v)=>s+(Number(v)||0),0);
+    const spent=Object.values(used).reduce((s,v)=>s+(Number(v)||0),0);
+    const left=planned-spent,pct=planned?spent/planned*100:0;
+    host.innerHTML='<div class="v31-budget-kpi"><small>Orçamento do mês</small><strong class="privacy-value">'+money(planned)+'</strong></div>'+
+      '<div class="v31-budget-kpi"><small>Já utilizado</small><strong class="privacy-value">'+money(spent)+'</strong></div>'+
+      '<div class="v31-budget-kpi"><small>'+(left>=0?'Ainda disponível':'Acima do orçamento')+'</small><strong class="privacy-value '+(left<0?'negative':'positive')+'">'+money(Math.abs(left))+'</strong></div>'+
+      '<div class="v31-budget-status" style="grid-column:1/-1"><strong>'+Math.round(pct)+'% utilizado</strong> · '+(planned?(pct>100?'Seu orçamento mensal foi ultrapassado.':pct>=80?'Atenção: você está próximo do limite do mês.':'Você ainda está dentro do planejamento.'):'Defina limites por categoria para acompanhar o mês.')+'</div>';
+    applyPrivacyState?.();
+  }
+  function installBudget(){
+    if(!window.V27Budget||V27Budget.__v31)return;
+    V27Budget.__v31=true;
+    const old=V27Budget.render.bind(V27Budget);
+    V27Budget.render=function(){old();budgetSummary()};
+    budgetSummary();
+  }
+  function installAssistant(){
+    const box=document.querySelector(".ai-assistant");if(!box||box.dataset.v32==="1")return;
+    box.dataset.v32="1";
+    const head=box.querySelector(":scope > .section-title");if(!head)return;
+    head.setAttribute("role","button");head.tabIndex=0;head.title="Abrir ou fechar o Assistente financeiro";
+    const toggle=()=>box.classList.toggle("ai-open");
+    head.addEventListener("click",toggle);
+    head.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle()}});
+    document.querySelectorAll(".ai-example").forEach(btn=>btn.addEventListener("click",()=>box.classList.add("ai-open")));
+  }
+  setTimeout(()=>{installBudget();installAssistant()},250);
+  setTimeout(()=>{installBudget();budgetSummary();installAssistant()},1200);
+  document.addEventListener("click",e=>{
+    if(e.target.closest('[data-view="budget"],.month-chip'))setTimeout(budgetSummary,180);
+  });
+  document.getElementById("monthSelect")?.addEventListener("change",()=>setTimeout(budgetSummary,180));
 })();
 </script></body>
 </html>
