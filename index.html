@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0C2A3A">
-  <title>Finanças a Dois — V2.9 TEST</title>
+  <title>Finanças a Dois — V3.0 TEST</title>
   <meta name="description" content="Controle financeiro do casal: registre gastos, acompanhe orçamento, metas e patrimônio.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -868,7 +868,7 @@
 </style>
 
   <style id="v281-public-dashboard">
-    /* V2.9 TEST — Dashboard enxuto para validação de produto final */
+    /* V3.0 TEST — Dashboard enxuto para validação de produto final */
     #dashboard{display:flex;flex-direction:column;gap:16px}
     #dashboard>.cards{order:1;margin:0!important}
     #dashboard>#cfoPanel{order:2;margin:0!important}
@@ -911,7 +911,7 @@
   </style>
 
   <style id="v282-page-navigation">
-    /* V2.9 TEST — navegação com sensação real de páginas */
+    /* V3.0 TEST — navegação com sensação real de páginas */
     .tabs{display:none!important}
     body:not(.view-dashboard) main>.ai-assistant,
     body:not(.view-dashboard) #dashboardMonths,
@@ -928,7 +928,7 @@
   </style>
 
   <style id="v283-strict-page-router">
-    /* V2.9 TEST — roteamento visual estrito: uma tela por vez */
+    /* V3.0 TEST — roteamento visual estrito: uma tela por vez */
     body.view-dashboard main>.view{display:none!important}
     body.view-dashboard main>#dashboard{display:block!important}
     body.view-transactions main>.view{display:none!important}
@@ -944,7 +944,7 @@
   </style>
 
   <style id="v29-dashboard-product">
-    /* V2.9 TEST — Dashboard orientado às três perguntas essenciais */
+    /* V3.0 TEST — Dashboard orientado às três perguntas essenciais */
     body.view-dashboard #dashboard>.v29-summary-cards{
       grid-template-columns:repeat(4,minmax(0,1fr))!important;
       gap:12px!important;
@@ -969,6 +969,20 @@
       body.view-dashboard #dashboard>.v29-summary-cards{grid-template-columns:1fr 1fr!important}
     }
   </style>
+
+<style id="v30-dashboard-top-and-receipt">
+  /* V3.0 TEST — KPIs primeiro + comprovante como ação independente */
+  body.view-dashboard #dashboard>.v29-summary-cards{order:1!important}
+  body.view-dashboard #dashboard>#cfoPanel{order:2!important}
+  body.view-dashboard #dashboard>.grid{order:3!important}
+  body.view-dashboard #dashboard>.card.section{order:4!important}
+  body.view-dashboard #dashboard{padding-top:0!important}
+  body.view-dashboard #dashboard>.v29-summary-cards{margin-top:0!important}
+  @media(max-width:760px){
+    .toolbar .actions button[onclick="openCameraImport()"]{font-size:0}
+    .toolbar .actions button[onclick="openCameraImport()"]::after{content:"📷";font-size:15px}
+  }
+</style>
 </head>
 
 <body>
@@ -1087,7 +1101,7 @@
       <div class="actions">
         <button class="btn" onclick="exportCSV()">Exportar CSV</button>
         <button class="btn" type="button" onclick="openSmartImport()" title="Importar CSV, OFX ou PDF">📥 Importar</button>
-        <button class="btn" type="button" onclick="openCameraImport()" title="Tirar foto ou anexar print">📷</button>
+        <button class="btn" type="button" onclick="openCameraImport()" title="Importar comprovante por foto ou print">📷 Importar comprovante</button>
         <button class="btn btn-primary" onclick="openModal()">+ Novo lançamento</button>
         <input id="smartImportFile" type="file" accept=".csv,.ofx,.qfx,.pdf,text/csv,application/pdf" style="display:none">
         <input id="cameraImportFile" type="file" accept="image/*" style="display:none">
@@ -1379,9 +1393,7 @@
       <button class="close" onclick="closeModal()">✕</button>
     </div>
     <form id="transactionForm" class="entry-confirmation" novalidate>
-      <div class="ocr-box" id="ocrBox">
-        <label style="display:block;margin-bottom:7px">Lançamento por print</label>
-        <label class="ocr-drop" for="receiptImage" id="ocrDrop">📷 Toque aqui para escolher um print ou foto do comprovante<br><span style="font-size:11px">O sistema tenta identificar data, valor e descrição. Confira os campos antes de salvar.</span></label>
+      <div class="ocr-box" id="ocrBox" style="display:none">
         <input id="receiptImage" type="file" accept="image/*" style="display:none">
         <img id="ocrPreview" class="ocr-preview" alt="Prévia do comprovante">
         <div id="ocrStatus" class="ocr-status"></div>
