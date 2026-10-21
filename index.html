@@ -1706,7 +1706,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
         </div>
         <div class="field">
           <label>Responsável</label>
-          <select id="tResponsible"><option>Danillo</option><option>Patricia</option></select>
+          <div style="display:flex;gap:7px"><select id="tResponsible" style="flex:1"></select><button id="addResponsibleBtn" class="btn" type="button" title="Adicionar outra pessoa" style="padding:0 12px;min-width:42px">＋</button></div>
         </div>
         <div class="field">
           <label>Categoria</label>
@@ -1975,6 +1975,7 @@ Regras:
   let state = emptyState();
 
   let currentUser = null;
+  let accountProfile = {};
   let cloudReady = false;
   let loadingCloud = false;
   let savingCloud = false;
@@ -2001,6 +2002,46 @@ Regras:
 
   function userRef(){
     return firebaseDb.collection("users").doc(currentUser.uid);
+  }
+  function accountResponsibles(){
+    const names=Array.isArray(accountProfile.responsibles) ? accountProfile.responsibles : [];
+    const primary=String(accountProfile.name||"").trim();
+    const combined=[primary,...names].map(x=>String(x||"").trim()).filter(Boolean);
+    return [...new Set(combined.length ? combined : ["Responsável"])];
+  }
+
+  function populateResponsibles(selectedName=""){
+    const el=$("tResponsible");
+    if(!el) return;
+    const names=accountResponsibles();
+    el.innerHTML=names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join("");
+    if(selectedName && !names.includes(selectedName)){
+      const opt=document.createElement("option"); opt.value=selectedName; opt.textContent=selectedName; el.appendChild(opt);
+    }
+    el.value=selectedName || names[0] || "";
+  }
+
+  async function addResponsible(){
+    if(!currentUser) return;
+    const raw=window.prompt("Nome da segunda pessoa:");
+    if(raw===null) return;
+    const name=raw.trim().replace(/\s+/g," ");
+    if(name.length<2){ toast("Digite um nome válido."); return; }
+    const names=accountResponsibles();
+    if(names.some(n=>n.toLowerCase()===name.toLowerCase())){ populateResponsibles(name); return; }
+    accountProfile.responsibles=[...(accountProfile.responsibles||[]),name];
+    try{
+      await userRef().collection("settings").doc("main").set({
+        profile:accountProfile,
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+      },{merge:true});
+      populateResponsibles(name);
+      toast(name+" foi adicionado(a) como responsável.");
+    }catch(err){
+      console.error(err);
+      accountProfile.responsibles=(accountProfile.responsibles||[]).filter(n=>n!==name);
+      toast("Não foi possível adicionar a pessoa.");
+    }
   }
 
   async function saveCloudState(){
@@ -2077,6 +2118,14 @@ Regras:
 
       const profile = settingsSnap.exists ? (settingsSnap.data().profile || {}) : {};
       const isMainCoupleAccount = String(currentUser.email || "").toLowerCase() === "danillo@patricia.com.br";
+      accountProfile = {...profile};
+      if(isMainCoupleAccount){
+        accountProfile.name = accountProfile.name || "Danillo";
+        accountProfile.responsibles = Array.from(new Set([...(accountProfile.responsibles||[]),"Patricia"]));
+      }else if(!accountProfile.name){
+        accountProfile.name = String(currentUser.displayName || currentUser.email || "Responsável").split("@")[0];
+      }
+      populateResponsibles();
       document.body.classList.toggle("main-couple-account", isMainCoupleAccount);
       document.querySelectorAll(".personal-couple-photo").forEach(el=>{
         el.style.display = isMainCoupleAccount ? "" : "none";
@@ -2191,7 +2240,7 @@ Regras:
         });
 
         await firebaseDb.collection("users").doc(createdUser.uid).collection("settings").doc("main").set({
-          profile:{name,email:createdUser.email || email,betaInvite:inviteCode},
+          profile:{name,email:createdUser.email || email,betaInvite:inviteCode,responsibles:[]},
           budgets:{}, goals:[], wealth:[], cards:[],
           updatedAt:firebase.firestore.FieldValue.serverTimestamp()
         },{merge:true});
@@ -2320,6 +2369,7 @@ Regras:
     }else{
       cloudReady=false;
       state=emptyState();
+      accountProfile={};
       render();
       $("authGate").classList.remove("hidden");
       $("authUser").textContent="";
@@ -3006,19 +3056,21 @@ Regras:
       $("tType").value = tx.type||"expense";
       $("tDate").value = tx.date||"";
       $("tDescription").value = tx.description||"";
-      $("tResponsible").value = tx.responsible||"Danillo";
+      populateResponsibles(tx.responsible||"");
       $("tCategory").value = tx.category||categories[0];
       $("tAmount").value = formatBRLInput(tx.amount||0);
       $("tChannel").value = tx.channel||"";
       $("tDetails").value = tx.details||"";
     } else {
       $("transactionForm").reset();
+      populateResponsibles();
       const today=new Date(); const defaultDate=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
       $("tDate").value = selectedMonth===defaultDate.slice(0,7) ? defaultDate : `${selectedMonth}-01`;
     }
     updateCcVisibility();
     $("tDescription").focus();
   }
+  $("addResponsibleBtn").addEventListener("click",addResponsible);
   function closeModal(){$("modalBackdrop").classList.remove("open"); editingTransactionId=null; $("ocrBox").style.display="";}
   function editTransaction(id){ openModal(id); }
   window.editTransaction = editTransaction;
