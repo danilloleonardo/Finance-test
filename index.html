@@ -2234,7 +2234,8 @@ Regras:
     "F2-K7M4-XQ9P","F2-W3R8-N6TZ","F2-P9VX-4K2H","F2-H6Q2-Y8MW","F2-Z4NK-7R3X",
     "F2-M8T5-Q2VP","F2-R2Y9-K6NW","F2-X7P3-M9QH","F2-N5W8-Z4KT","F2-Q9H6-V3MX"
   ];
-  const isBetaAdmin=()=>String(currentUser?.email||"").toLowerCase()==="danillo@patricia.com.br";
+  const BETA_ADMIN_EMAIL="danillo@patricia.com.br";
+  const isBetaAdmin=()=>String(currentUser?.email||"").toLowerCase()===BETA_ADMIN_EMAIL;
 
   async function renderBetaAdmin(){
     if(!isBetaAdmin()) return;
@@ -2288,7 +2289,7 @@ Regras:
       $("authUser").textContent=user.email || "";
       $("logoutBtn").style.display="inline-flex";
       $("drawerEmail").textContent=user.email || "";
-      $("betaAdminBtn").style.display=String(user.email||"").toLowerCase()==="danillo@patricia.com.br" ? "inline-flex" : "none";
+      $("betaAdminBtn").style.display=isBetaAdmin() ? "inline-flex" : "none";
       await loadCloudData();
     }else{
       cloudReady=false;
