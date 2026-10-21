@@ -1214,6 +1214,12 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
     <h2>Finanças a Dois</h2>
     <p>Entre para acessar seus dados financeiros. Os lançamentos ficam salvos na nuvem e podem ser acessados de outro dispositivo.</p>
     <div id="authError" class="auth-error"></div>
+    <div id="signupFields" style="display:none">
+      <div class="field">
+        <label>Seu nome</label>
+        <input id="authName" type="text" autocomplete="name" maxlength="60" placeholder="Como podemos chamar você?">
+      </div>
+    </div>
     <div class="field">
       <label>E-mail</label>
       <input id="authEmail" type="email" autocomplete="email" placeholder="seu@email.com">
@@ -1222,9 +1228,14 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
       <label>Senha</label>
       <input id="authPassword" type="password" autocomplete="current-password" placeholder="Mínimo de 6 caracteres">
     </div>
+    <div id="signupConfirmField" class="field" style="display:none">
+      <label>Confirmar senha</label>
+      <input id="authPasswordConfirm" type="password" autocomplete="new-password" placeholder="Digite a senha novamente">
+    </div>
     <div class="auth-actions">
       <button id="loginBtn" class="btn btn-primary">Entrar</button>
       <button id="signupBtn" class="btn">Criar conta</button>
+      <button id="signupCancelBtn" class="btn" type="button" style="display:none">Voltar</button>
     </div>
     <button id="resetBtn" class="btn-link">Esqueci minha senha</button>
     <div style="font-size:11px;color:var(--muted);margin-top:10px">Para vocês dois usarem o mesmo painel de forma simples, podem entrar com a mesma conta.</div>
@@ -1310,7 +1321,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
 
   <div class="welcome">
     <div class="welcome-inner">
-      <div class="welcome-title">Bem-vindo, Sr. Danillo e Srta. Patricia</div>
+      <div id="welcomeTitle" class="welcome-title">Bem-vindo</div>
       <div class="welcome-subtitle">Que este seja um espaço para construirmos juntos uma vida financeira mais próspera.</div>
     </div>
   </div>
@@ -2019,6 +2030,12 @@ Regras:
       }
       state.cards = state.cards || [];
 
+      const profile = settingsSnap.exists ? (settingsSnap.data().profile || {}) : {};
+      const isMainCoupleAccount = String(currentUser.email || "").toLowerCase() === "danillo@patricia.com.br";
+      $("welcomeTitle").textContent = isMainCoupleAccount
+        ? "Bem-vindo, Sr. Danillo e Srta. Patricia"
+        : (profile.name ? `Bem-vindo, ${profile.name}!` : "Bem-vindo!");
+
       localStorage.setItem(userStorageKey(currentUser.uid), JSON.stringify(state));
       cloudReady = true;
       render();
@@ -2069,8 +2086,31 @@ Regras:
     if(e.key==="Enter"){e.preventDefault();$("loginBtn").click();}
   }));
 
+  let signupMode=false;
+  function setSignupMode(enabled){
+    signupMode=enabled;
+    $("signupFields").style.display=enabled ? "block" : "none";
+    $("signupConfirmField").style.display=enabled ? "block" : "none";
+    $("signupCancelBtn").style.display=enabled ? "inline-flex" : "none";
+    $("loginBtn").style.display=enabled ? "none" : "inline-flex";
+    $("resetBtn").style.display=enabled ? "none" : "inline-block";
+    $("signupBtn").textContent=enabled ? "Criar minha conta" : "Criar conta";
+    $("authPassword").setAttribute("autocomplete", enabled ? "new-password" : "current-password");
+    clearAuthError();
+    if(enabled) setTimeout(()=>$("authName").focus(),0);
+  }
+
   $("signupBtn").addEventListener("click", async()=>{
     clearAuthError();
+    if(!signupMode){ setSignupMode(true); return; }
+
+    const name=$("authName").value.trim().replace(/\s+/g," ");
+    const email=$("authEmail").value.trim();
+    const password=$("authPassword").value;
+    const confirm=$("authPasswordConfirm").value;
+    if(name.length<2){ showAuthError("Digite seu nome."); return; }
+    if(password!==confirm){ showAuthError("As senhas não coincidem."); return; }
+
     // Segurança multiusuário: nunca permita que o estado da sessão anterior
     // acompanhe a troca automática de autenticação criada pelo cadastro.
     cloudReady=false;
@@ -2078,9 +2118,20 @@ Regras:
     state=emptyState();
     render();
     try{
-      await firebaseAuth.createUserWithEmailAndPassword($("authEmail").value.trim(), $("authPassword").value);
+      const credential=await firebaseAuth.createUserWithEmailAndPassword(email,password);
+      const createdUser=credential.user;
+      if(createdUser){
+        await firebaseDb.collection("users").doc(createdUser.uid).collection("settings").doc("main").set({
+          profile:{name,email:createdUser.email || email},
+          budgets:{}, goals:[], wealth:[], cards:[],
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        },{merge:true});
+      }
+      setSignupMode(false);
     }catch(err){ showAuthError(authError(err)); }
   });
+
+  $("signupCancelBtn").addEventListener("click",()=>setSignupMode(false));
 
   $("resetBtn").addEventListener("click", async()=>{
     clearAuthError();
@@ -2144,6 +2195,7 @@ Regras:
       $("authUser").textContent="";
       $("logoutBtn").style.display="none";
       $("drawerEmail").textContent="";
+      $("welcomeTitle").textContent="Bem-vindo";
       closeDrawer();
     }
   });
