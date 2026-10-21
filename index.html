@@ -1255,6 +1255,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
   <div class="modal-card" style="max-width:620px">
     <div class="modal-head"><div><strong>Painel do Beta</strong><div class="muted-sm">Controle dos 10 convites</div></div><button id="betaAdminClose" class="btn" type="button">Fechar</button></div>
     <div id="betaAdminSummary" style="margin:14px 0"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button id="betaInitBtn" class="btn btn-primary" type="button">Inicializar convites</button><button id="betaRefreshBtn" class="btn" type="button">Atualizar</button></div>
     <div id="betaAdminList" style="display:grid;gap:8px"></div>
     <div style="margin-top:14px;font-size:11px;color:var(--muted)">Capacidade técnica: Firestore no plano gratuito oferece 50 mil leituras/dia, 20 mil gravações/dia e 1 GiB. O consumo real deve ser acompanhado no Console Firebase. A IA possui cotas próprias do modelo/projeto.</div>
   </div>
@@ -2256,6 +2257,26 @@ Regras:
       list.innerHTML='<div class="empty">O painel ainda não consegue ler a coleção betaInvites.</div>';
     }
   }
+  async function initializeBetaInvites(){
+    if(!isBetaAdmin()) return;
+    $("betaInitBtn").disabled=true;
+    try{
+      const batch=firebaseDb.batch();
+      for(const code of BETA_INVITES){
+        const ref=firebaseDb.collection("betaInvites").doc(code);
+        const snap=await ref.get();
+        if(!snap.exists) batch.set(ref,{used:false,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      }
+      await batch.commit();
+      toast("Convites do Beta inicializados.");
+      await renderBetaAdmin();
+    }catch(err){
+      console.error(err);
+      toast("Publique primeiro as regras do Beta no Firestore.");
+    }finally{$("betaInitBtn").disabled=false;}
+  }
+  $("betaInitBtn").addEventListener("click",initializeBetaInvites);
+  $("betaRefreshBtn").addEventListener("click",renderBetaAdmin);
   $("betaAdminBtn").addEventListener("click",()=>{ $("betaAdminModal").classList.add("open"); renderBetaAdmin(); });
   $("betaAdminClose").addEventListener("click",()=>$("betaAdminModal").classList.remove("open"));
   $("betaAdminModal").addEventListener("click",e=>{if(e.target===$("betaAdminModal")) $("betaAdminModal").classList.remove("open");});
