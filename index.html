@@ -2071,6 +2071,12 @@ Regras:
 
   $("signupBtn").addEventListener("click", async()=>{
     clearAuthError();
+    // Segurança multiusuário: nunca permita que o estado da sessão anterior
+    // acompanhe a troca automática de autenticação criada pelo cadastro.
+    cloudReady=false;
+    loadingCloud=false;
+    state=emptyState();
+    render();
     try{
       await firebaseAuth.createUserWithEmailAndPassword($("authEmail").value.trim(), $("authPassword").value);
     }catch(err){ showAuthError(authError(err)); }
