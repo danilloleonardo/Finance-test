@@ -809,6 +809,9 @@
       .mobile-couple-avatars{transform:scale(.92);transform-origin:left center;margin-right:-1px}
     }
   
+    /* Perfil privado: fotos do casal somente na conta principal */
+    body:not(.main-couple-account) .personal-couple-photo{display:none!important}
+
     /* ===== Finance-test — variação VERDE ===== */
     :root{
       --navy-900:#061a14; --navy-800:#0b2b20; --navy-700:#124b37; --teal-600:#176b4b;
@@ -2032,6 +2035,7 @@ Regras:
 
       const profile = settingsSnap.exists ? (settingsSnap.data().profile || {}) : {};
       const isMainCoupleAccount = String(currentUser.email || "").toLowerCase() === "danillo@patricia.com.br";
+      document.body.classList.toggle("main-couple-account", isMainCoupleAccount);
       document.querySelectorAll(".personal-couple-photo").forEach(el=>{
         el.style.display = isMainCoupleAccount ? "" : "none";
       });
@@ -2199,6 +2203,7 @@ Regras:
       $("logoutBtn").style.display="none";
       $("drawerEmail").textContent="";
       $("welcomeTitle").textContent="Bem-vindo";
+      document.body.classList.remove("main-couple-account");
       document.querySelectorAll(".personal-couple-photo").forEach(el=>{ el.style.display="none"; });
       closeDrawer();
     }
