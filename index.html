@@ -1207,6 +1207,27 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
  body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{padding-left:14px!important;padding-right:40px!important}
 }
 </style>
+<style id="beta-admin-modal-fix">
+#betaAdminModal{
+  position:fixed!important;inset:0!important;width:auto!important;max-width:none!important;height:auto!important;
+  padding:18px!important;background:rgba(4,12,18,.68)!important;z-index:5000!important;
+  display:none!important;align-items:center!important;justify-content:center!important;
+  overflow:auto!important;border:0!important;border-radius:0!important;box-shadow:none!important;
+  backdrop-filter:blur(4px);
+}
+#betaAdminModal.open{display:flex!important}
+#betaAdminModal>.modal-card{
+  width:min(620px,100%)!important;max-height:88vh!important;overflow:auto!important;
+  background:var(--card)!important;border:1px solid var(--border)!important;border-radius:20px!important;
+  padding:22px!important;box-shadow:0 30px 90px rgba(0,0,0,.38)!important;
+}
+#betaAdminModal .modal-head{position:sticky;top:-22px;background:var(--card);z-index:2;padding:2px 0 12px;margin-bottom:8px}
+@media(max-width:760px){
+ #betaAdminModal{padding:10px!important;align-items:flex-end!important}
+ #betaAdminModal>.modal-card{width:100%!important;max-height:86vh!important;border-radius:20px 20px 12px 12px!important;padding:18px!important}
+ #betaAdminModal .modal-head{top:-18px}
+}
+</style>
 </head>
 
 <body>
