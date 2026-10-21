@@ -1231,6 +1231,11 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
       <label>Senha</label>
       <input id="authPassword" type="password" autocomplete="current-password" placeholder="Mínimo de 6 caracteres">
     </div>
+    <div id="signupInviteField" class="field" style="display:none">
+      <label>Código de convite</label>
+      <input id="authInvite" type="text" autocomplete="off" maxlength="20" placeholder="F2-XXXX-XXXX" style="text-transform:uppercase">
+      <div style="font-size:11px;color:var(--muted);margin-top:5px">Beta fechado · cada convite pode criar apenas uma conta.</div>
+    </div>
     <div id="signupConfirmField" class="field" style="display:none">
       <label>Confirmar senha</label>
       <input id="authPasswordConfirm" type="password" autocomplete="new-password" placeholder="Digite a senha novamente">
@@ -1245,6 +1250,16 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
   </div>
 </div>
 <div id="firebaseStatus"></div>
+<button id="betaAdminBtn" type="button" class="btn" style="display:none;position:fixed;right:18px;bottom:18px;z-index:1200;box-shadow:0 10px 30px rgba(0,0,0,.18)">🧪 Beta</button>
+<div id="betaAdminModal" class="modal">
+  <div class="modal-card" style="max-width:620px">
+    <div class="modal-head"><div><strong>Painel do Beta</strong><div class="muted-sm">Controle dos 10 convites</div></div><button id="betaAdminClose" class="btn" type="button">Fechar</button></div>
+    <div id="betaAdminSummary" style="margin:14px 0"></div>
+    <div id="betaAdminList" style="display:grid;gap:8px"></div>
+    <div style="margin-top:14px;font-size:11px;color:var(--muted)">Capacidade técnica: Firestore no plano gratuito oferece 50 mil leituras/dia, 20 mil gravações/dia e 1 GiB. O consumo real deve ser acompanhado no Console Firebase. A IA possui cotas próprias do modelo/projeto.</div>
+  </div>
+</div>
+
 <div class="app">
   <aside class="desktop-sidebar" id="desktopSidebar" aria-label="Navegação principal">
     <div class="side-brand">
@@ -2097,6 +2112,7 @@ Regras:
   function setSignupMode(enabled){
     signupMode=enabled;
     $("signupFields").style.display=enabled ? "block" : "none";
+    $("signupInviteField").style.display=enabled ? "block" : "none";
     $("signupConfirmField").style.display=enabled ? "block" : "none";
     $("signupCancelBtn").style.display=enabled ? "inline-flex" : "none";
     $("loginBtn").style.display=enabled ? "none" : "inline-flex";
@@ -2115,7 +2131,9 @@ Regras:
     const email=$("authEmail").value.trim();
     const password=$("authPassword").value;
     const confirm=$("authPasswordConfirm").value;
+    const inviteCode=$("authInvite").value.trim().toUpperCase();
     if(name.length<2){ showAuthError("Digite seu nome."); return; }
+    if(!/^F2-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(inviteCode)){ showAuthError("Digite um código de convite válido."); return; }
     if(password!==confirm){ showAuthError("As senhas não coincidem."); return; }
 
     // Segurança multiusuário: nunca permita que o estado da sessão anterior
@@ -2127,13 +2145,38 @@ Regras:
     try{
       const credential=await firebaseAuth.createUserWithEmailAndPassword(email,password);
       const createdUser=credential.user;
-      if(createdUser){
+      if(!createdUser) throw new Error("Não foi possível criar a conta.");
+
+      try{
+        const inviteRef=firebaseDb.collection("betaInvites").doc(inviteCode);
+        await firebaseDb.runTransaction(async tx=>{
+          const snap=await tx.get(inviteRef);
+          if(!snap.exists) throw Object.assign(new Error("Convite inválido."),{code:"beta/invite-invalid"});
+          const data=snap.data()||{};
+          if(data.used) throw Object.assign(new Error("Este convite já foi utilizado."),{code:"beta/invite-used"});
+          tx.update(inviteRef,{
+            used:true,
+            usedBy:createdUser.uid,
+            usedEmail:createdUser.email || email,
+            usedName:name,
+            usedAt:firebase.firestore.FieldValue.serverTimestamp()
+          });
+        });
+
         await firebaseDb.collection("users").doc(createdUser.uid).collection("settings").doc("main").set({
-          profile:{name,email:createdUser.email || email},
+          profile:{name,email:createdUser.email || email,betaInvite:inviteCode},
           budgets:{}, goals:[], wealth:[], cards:[],
           updatedAt:firebase.firestore.FieldValue.serverTimestamp()
         },{merge:true});
+      }catch(inviteErr){
+        try{ await createdUser.delete(); }catch(cleanErr){ console.warn("Não foi possível remover cadastro incompleto.",cleanErr); }
+        state=emptyState(); cloudReady=false;
+        if(inviteErr.code==="beta/invite-used") showAuthError("Este convite já foi utilizado. Peça um novo convite.");
+        else if(inviteErr.code==="permission-denied") showAuthError("O Beta ainda está sendo configurado. Tente novamente em alguns minutos.");
+        else showAuthError("Código de convite inválido.");
+        return;
       }
+      $("authInvite").value="";
       setSignupMode(false);
     }catch(err){ showAuthError(authError(err)); }
   });
@@ -2186,6 +2229,37 @@ Regras:
   $("drawerPrivacyBtn").addEventListener("click",()=>$("privacyBtn").click());
   $("drawerThemeBtn").addEventListener("click",()=>$("themeBtn").click());
 
+  const BETA_INVITES=[
+    "F2-K7M4-XQ9P","F2-W3R8-N6TZ","F2-P9VX-4K2H","F2-H6Q2-Y8MW","F2-Z4NK-7R3X",
+    "F2-M8T5-Q2VP","F2-R2Y9-K6NW","F2-X7P3-M9QH","F2-N5W8-Z4KT","F2-Q9H6-V3MX"
+  ];
+  const isBetaAdmin=()=>String(currentUser?.email||"").toLowerCase()==="danillo@patricia.com.br";
+
+  async function renderBetaAdmin(){
+    if(!isBetaAdmin()) return;
+    const list=$("betaAdminList"), summary=$("betaAdminSummary");
+    list.innerHTML='<div class="muted-sm">Carregando convites…</div>';
+    try{
+      const snaps=await Promise.all(BETA_INVITES.map(code=>firebaseDb.collection("betaInvites").doc(code).get()));
+      let used=0;
+      const rows=snaps.map((snap,i)=>{
+        const code=BETA_INVITES[i], d=snap.exists?(snap.data()||{}):null;
+        if(d?.used) used++;
+        const status=!d?"⚙️ Não inicializado":d.used?"🔴 Utilizado":"🟢 Disponível";
+        const who=d?.used ? ('<div class="muted-sm">'+esc(d.usedName||"")+(d.usedEmail?' · '+esc(d.usedEmail):'')+'</div>') : "";
+        return '<div style="padding:10px 12px;border:1px solid var(--line);border-radius:12px;display:flex;justify-content:space-between;gap:12px;align-items:center"><div><strong>'+esc(code)+'</strong>'+who+'</div><div style="font-size:12px;white-space:nowrap">'+status+'</div></div>';
+      });
+      summary.innerHTML='<div style="font-size:24px;font-weight:800">'+used+' / '+BETA_INVITES.length+'</div><div class="muted-sm">'+(BETA_INVITES.length-used)+' convites disponíveis · atingir 10/10 bloqueia apenas novos cadastros.</div>';
+      list.innerHTML=rows.join("");
+    }catch(err){
+      summary.innerHTML='<strong>Configuração do Beta pendente</strong><div class="muted-sm">Publique as regras do Firestore e inicialize os 10 documentos de convite.</div>';
+      list.innerHTML='<div class="empty">O painel ainda não consegue ler a coleção betaInvites.</div>';
+    }
+  }
+  $("betaAdminBtn").addEventListener("click",()=>{ $("betaAdminModal").classList.add("open"); renderBetaAdmin(); });
+  $("betaAdminClose").addEventListener("click",()=>$("betaAdminModal").classList.remove("open"));
+  $("betaAdminModal").addEventListener("click",e=>{if(e.target===$("betaAdminModal")) $("betaAdminModal").classList.remove("open");});
+
   firebaseAuth.onAuthStateChanged(async(user)=>{
     currentUser=user;
     if(user){
@@ -2193,6 +2267,7 @@ Regras:
       $("authUser").textContent=user.email || "";
       $("logoutBtn").style.display="inline-flex";
       $("drawerEmail").textContent=user.email || "";
+      $("betaAdminBtn").style.display=String(user.email||"").toLowerCase()==="danillo@patricia.com.br" ? "inline-flex" : "none";
       await loadCloudData();
     }else{
       cloudReady=false;
@@ -2202,6 +2277,8 @@ Regras:
       $("authUser").textContent="";
       $("logoutBtn").style.display="none";
       $("drawerEmail").textContent="";
+      $("betaAdminBtn").style.display="none";
+      $("betaAdminModal").classList.remove("open");
       $("welcomeTitle").textContent="Bem-vindo";
       document.body.classList.remove("main-couple-account");
       document.querySelectorAll(".personal-couple-photo").forEach(el=>{ el.style.display="none"; });
