@@ -1228,6 +1228,11 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
  #betaAdminModal .modal-head{top:-18px}
 }
 </style>
+<style id="beta-admin-button-position">
+@media(max-width:760px){
+  #betaAdminBtn{right:88px!important;bottom:18px!important;min-height:42px!important}
+}
+</style>
 </head>
 
 <body>
@@ -1271,7 +1276,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
   </div>
 </div>
 <div id="firebaseStatus"></div>
-<button id="betaAdminBtn" type="button" class="btn" style="display:none;position:fixed;right:18px;bottom:18px;z-index:1200;box-shadow:0 10px 30px rgba(0,0,0,.18)">🧪 Beta</button>
+<button id="betaAdminBtn" type="button" class="btn" style="display:none;position:fixed;right:104px;bottom:22px;z-index:1200;box-shadow:0 10px 30px rgba(0,0,0,.18)">🧪 Beta</button>
 <div id="betaAdminModal" class="modal">
   <div class="modal-card" style="max-width:620px">
     <div class="modal-head"><div><strong>Painel do Beta</strong><div class="muted-sm">Controle dos 10 convites</div></div><button id="betaAdminClose" class="btn" type="button">Fechar</button></div>
