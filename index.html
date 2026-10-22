@@ -1394,6 +1394,8 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
       </div>
       <div class="actions">
         <button class="btn" type="button" onclick="exportBackup()" title="Baixar uma cópia completa e restaurável dos seus dados">Backup completo</button>
+        <button class="btn" type="button" onclick="document.getElementById('restoreBackupFile').click()" title="Restaurar dados a partir de um backup JSON">Restaurar backup</button>
+        <input id="restoreBackupFile" type="file" accept=".json,application/json" style="display:none" onchange="restoreBackupPreview(event)">
         <button class="btn" onclick="exportCSV()">Exportar CSV</button>
         <button class="btn" type="button" onclick="openSmartImport()" title="Importar CSV, OFX ou PDF">📥 Importar</button>
         <button class="btn" type="button" onclick="openCameraImport()" title="Importar comprovante por foto ou print">📷 Importar comprovante</button>
@@ -3815,6 +3817,52 @@ Regras:
     a.click();
     setTimeout(()=>URL.revokeObjectURL(url),0);
     toast("Backup completo baixado com segurança.");
+  };
+
+  /* V3.7 — restauração de backup com conferência antes de substituir dados. */
+  window.restoreBackupPreview=async event=>{
+    const input=event.target;
+    const file=input.files&&input.files[0];
+    input.value="";
+    if(!file)return;
+    if(!currentUser){toast("Entre na conta antes de restaurar um backup.");return;}
+    let payload;
+    try{payload=JSON.parse(await file.text());}
+    catch(err){toast("Não foi possível ler o arquivo. Selecione um backup JSON válido.");return;}
+    const data=payload&&payload.data;
+    if(payload?.format!=="financas-a-dois-backup"||!data||!Array.isArray(data.transactions)||!data.budgets||typeof data.budgets!=="object"||Array.isArray(data.budgets)){
+      toast("Este arquivo não parece ser um backup válido do Finanças a Dois.");return;
+    }
+    if(data.transactions.some(t=>!t||!t.id)){toast("O backup contém lançamentos inválidos. Nenhum dado foi alterado.");return;}
+    const txCount=data.transactions.length;
+    const budgetCount=Object.values(data.budgets).reduce((n,v)=>n+(v&&typeof v==="object"&&!Array.isArray(v)?Object.keys(v).length:1),0);
+    const goalCount=Array.isArray(data.goals)?data.goals.length:0;
+    const cardCount=Array.isArray(data.cards)?data.cards.length:0;
+    const wealthCount=Array.isArray(data.wealth)?data.wealth.length:0;
+    const date=payload.exportedAt&&!Number.isNaN(Date.parse(payload.exportedAt))?new Date(payload.exportedAt).toLocaleString("pt-BR"):"não informada";
+    const summary=["BACKUP ENCONTRADO","","Arquivo: "+file.name,"Gerado em: "+date,"","Conteúdo que será restaurado:","• "+txCount+" lançamentos","• "+budgetCount+" limites de orçamento","• "+goalCount+" metas","• "+cardCount+" cartões","• "+wealthCount+" itens de patrimônio","","A restauração substituirá os dados atuais desta conta. Guarde o backup atual antes de continuar.","","Deseja prosseguir?"].join("\n");
+    if(!window.confirm(summary))return;
+    if(!window.confirm("CONFIRMAÇÃO FINAL\n\nOs dados atuais desta conta serão substituídos pelo conteúdo do arquivo. Essa ação não pode ser desfeita automaticamente. Restaurar agora?"))return;
+    try{
+      const normalized={...emptyState(),...data,transactions:data.transactions,budgets:data.budgets||{},goals:Array.isArray(data.goals)?data.goals:[],cards:Array.isArray(data.cards)?data.cards:[],wealth:Array.isArray(data.wealth)?data.wealth:[]};
+      const txRef=userRef().collection("transactions");
+      const existing=await txRef.get();
+      const writes=[...existing.docs.map(doc=>({type:"delete",ref:doc.ref})),...normalized.transactions.map(tx=>({type:"set",ref:txRef.doc(String(tx.id)),data:tx}))];
+      for(let i=0;i<writes.length;i+=400){
+        const batch=firebaseDb.batch();
+        writes.slice(i,i+400).forEach(w=>w.type==="delete"?batch.delete(w.ref):batch.set(w.ref,w.data));
+        await batch.commit();
+      }
+      state=normalized;
+      if(payload.profile&&typeof payload.profile==="object"&&!Array.isArray(payload.profile))accountProfile={...payload.profile};
+      localStorage.setItem(userStorageKey(currentUser.uid),JSON.stringify(state));
+      await userRef().collection("settings").doc("main").set({budgets:state.budgets,goals:state.goals,wealth:state.wealth,cards:state.cards,profile:accountProfile,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      render();
+      toast("Backup restaurado com sucesso. "+txCount+" lançamentos recuperados.");
+    }catch(err){
+      console.error("restoreBackupPreview",err);
+      toast("Não foi possível concluir a restauração. Confira sua conexão e tente novamente.");
+    }
   };
 
   window.exportCSV=()=>{
