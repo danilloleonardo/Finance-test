@@ -2086,6 +2086,29 @@ Regras:
     await userRef().collection("transactions").doc(id).delete();
   }
 
+  /*
+    Une formatos de orçamento de versões anteriores sem apagar nenhum limite:
+    - legado: { "Almoço-Trabalho": 500 }
+    - mensal: { "2026-10": { "Almoço-Trabalho": 500 } }
+    Valores já existentes na nuvem têm prioridade; o cache da própria conta
+    entra apenas para recuperar campos ausentes.
+  */
+  function mergeBudgetRecords(cloudBudgets,cachedBudgets){
+    const object=value=>value&&typeof value==="object"&&!Array.isArray(value);
+    const result={};
+    const copy=source=>{
+      if(!object(source))return;
+      Object.entries(source).forEach(([key,value])=>{result[key]=object(value)?{...value}:value;});
+    };
+    copy(cachedBudgets);
+    if(object(cloudBudgets)){
+      Object.entries(cloudBudgets).forEach(([key,value])=>{
+        result[key]=object(value)&&object(result[key])?{...result[key],...value}:object(value)?{...value}:value;
+      });
+    }
+    return result;
+  }
+
   async function loadCloudData(){
     if(!currentUser) return;
     loadingCloud = true;
@@ -2124,7 +2147,16 @@ Regras:
       }else{
         state.transactions = txSnap.docs.map(d => ({id:d.id, ...d.data()}));
         const settings = settingsSnap.exists ? settingsSnap.data() : {};
-        state.budgets = settings.budgets || {};
+        const cloudBudgets=settings.budgets || {};
+        const cachedBudgets=localState?.budgets || {};
+        state.budgets=mergeBudgetRecords(cloudBudgets,cachedBudgets);
+        /* Persiste somente o que estava ausente na nuvem; não remove nem troca valores existentes. */
+        if(JSON.stringify(state.budgets)!==JSON.stringify(cloudBudgets)){
+          await userRef().collection("settings").doc("main").set({
+            budgets:state.budgets,
+            updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+          },{merge:true});
+        }
         state.goals = settings.goals || [];
         state.wealth = settings.wealth || [];
         state.cards = settings.cards || state.cards || [];
@@ -3105,12 +3137,16 @@ Regras:
   window.editTransaction = editTransaction;
   function budgetMapForMonth(month=selectedMonth,create=false){
     state.budgets=state.budgets||{};
-    const current=state.budgets[month];
-    if(current&&typeof current==="object"&&!Array.isArray(current))return current;
     const legacy={};
     Object.entries(state.budgets).forEach(([key,value])=>{
       if(!/^\d{4}-\d{2}$/.test(key)&&typeof value==="number"&&Number.isFinite(value))legacy[key]=value;
     });
+    const current=state.budgets[month];
+    if(current&&typeof current==="object"&&!Array.isArray(current)){
+      /* Compatibilidade: mantém visíveis também os limites antigos ainda não migrados. */
+      if(create) Object.entries(legacy).forEach(([key,value])=>{if(current[key]===undefined)current[key]=value;});
+      return create ? current : {...legacy,...current};
+    }
     if(create){state.budgets[month]={...legacy};return state.budgets[month];}
     return legacy;
   }
@@ -5277,6 +5313,17 @@ header{background:#071A2D!important}
     /* Sempre restaura a abertura para o núcleo, mesmo após uma recriação legada do formulário. */
     window.openBudgetModal=category=>api.open(category);
     window.closeBudgetModal=()=>api.close();
+
+    /* Entrada por centavos: 800 → R$ 8,00; 80000 → R$ 800,00. */
+    const amount=document.getElementById("bAmount");
+    if(amount&&!amount.dataset.centMask){
+      amount.dataset.centMask="1";
+      amount.addEventListener("input",event=>{
+        const digits=String(event.currentTarget.value||"").replace(/\D/g,"");
+        event.currentTarget.value=digits?money(Number(digits)/100):"";
+      },true);
+    }
+
     if(form.dataset.v35Controller==="1")return true;
     form.dataset.v35Controller="1";
     if(button){button.removeAttribute("onclick");button.type="submit";button.disabled=false;}
