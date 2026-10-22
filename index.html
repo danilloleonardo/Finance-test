@@ -858,6 +858,15 @@
     .values-hidden #importBackdrop .import-original{color:var(--muted)!important}
     @media(max-width:900px){.import-row{grid-template-columns:32px 1fr 1fr}.import-field.merchant{grid-column:2/-1}.import-field.category{grid-column:2}.import-field.responsible{grid-column:3}.import-field.amount{grid-column:2/-1}}
     @media(max-width:600px){.import-row{grid-template-columns:28px 1fr;gap:10px}.import-field,.import-field.merchant,.import-field.category,.import-field.responsible,.import-field.amount{grid-column:2}.toolbar .actions{gap:6px}.toolbar .actions .btn{padding:9px 10px}}
+
+/* V3.4 — ajuda contextual curta */
+.page-title-help{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.context-help-btn{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.context-help-btn:hover{color:var(--text);border-color:var(--accent)}
+.context-help-box{display:none;margin-top:9px;max-width:620px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);font-size:12px;line-height:1.5;color:var(--muted);box-shadow:var(--shadow)}
+.context-help-box.open{display:block}.context-help-box strong{color:var(--text)}
+@media(max-width:640px){.page-title-help{gap:7px}.context-help-btn{padding:5px 9px}.context-help-box{max-width:100%;font-size:11px}}
+
 </style>
 <style id="v281-public-dashboard">
     /* V3.4 — Dashboard enxuto para validação de produto final */
@@ -1374,7 +1383,11 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
   <main>
     <div class="toolbar">
       <div>
-        <h2 id="pageTitle">Visão geral</h2>
+        <div class="page-title-help">
+          <h2 id="pageTitle">Visão geral</h2>
+          <button id="contextHelpBtn" class="context-help-btn" type="button" aria-expanded="false">ⓘ Como funciona?</button>
+        </div>
+        <div id="contextHelpBox" class="context-help-box"></div>
         <p id="monthLabel"></p><p style="font-size:11px;color:var(--muted);margin-top:3px">Use os meses acima para navegar pelo histórico. Os lançamentos antigos sem data aparecem em “Data não informada”.</p>
       </div>
       <div class="actions">
@@ -4601,16 +4614,17 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
 </script>
 <script id="v283-strict-page-router-script">
 (function(){
-  const titles={dashboard:"Visão geral",transactions:"Lançamentos",creditcard:"Cartão de crédito",budget:"Orçamento",goals:"Metas",wealth:"Patrimônio"};
+  const titles={dashboard:"Visão geral",transactions:"Lançamentos",creditcard:"Cartão de crédito",cards:"Meus cartões",budget:"Orçamento",goals:"Metas",wealth:"Patrimônio"};
   function navigate(view){
     if(!titles[view])view="dashboard";
-    ["dashboard","transactions","creditcard","budget","goals","wealth"].forEach(v=>{
+    ["dashboard","transactions","creditcard","cards","budget","goals","wealth"].forEach(v=>{
       document.body.classList.toggle("view-"+v,v===view);
       document.getElementById(v)?.classList.toggle("active",v===view);
     });
     document.querySelectorAll(".tab[data-view]").forEach(x=>x.classList.toggle("active",x.dataset.view===view));
     document.querySelectorAll(".side-nav[data-view]").forEach(x=>x.classList.toggle("active",x.dataset.view===view));
     const title=document.getElementById("pageTitle"); if(title)title.textContent=titles[view];
+    if(typeof window.__financeContextHelp==="function")window.__financeContextHelp(view);
     if(view==="creditcard"&&typeof renderCreditCard==="function")renderCreditCard();
     window.scrollTo({top:0,left:0,behavior:"auto"});
   }
@@ -4620,6 +4634,30 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
   window.__financeNavigate=navigate;
   const initial=document.querySelector(".side-nav.active[data-view]")?.dataset.view||"dashboard";
   navigate(initial);
+})();
+</script>
+<script id="v34-context-help-script">
+(function(){
+  const HELP={
+    dashboard:["Veja um resumo da sua vida financeira no mês selecionado.","Ex.: saldo, orçamento, economia e alertas em um só lugar."],
+    transactions:["Registre tudo o que entra, sai ou é transferido.","Ex.: supermercado de R$ 250 como despesa em Alimentação."],
+    creditcard:["Acompanhe as compras de cada fatura e os compromissos futuros.","Ex.: uma compra parcelada aparece nas faturas conforme cada parcela."],
+    cards:["Organize seus cartões com as datas de fechamento e vencimento.","Ex.: Cartão Itaú — fecha dia 5 e vence dia 12."],
+    budget:["Defina quanto pretende gastar por categoria e acompanhe o realizado.","Ex.: Alimentação com orçamento mensal de R$ 1.500."],
+    goals:["Crie objetivos financeiros e acompanhe seu progresso.","Ex.: Viagem — meta de R$ 20 mil, com R$ 7 mil já guardados."],
+    wealth:["Registre bens, investimentos e dívidas para acompanhar seu patrimônio.","Ex.: R$ 30 mil investidos e R$ 10 mil de financiamento."]
+  };
+  window.__financeContextHelp=function(view){
+    const btn=document.getElementById("contextHelpBtn"),box=document.getElementById("contextHelpBox"),h=HELP[view]||HELP.dashboard;
+    if(!btn||!box)return;
+    box.classList.remove("open");btn.setAttribute("aria-expanded","false");btn.textContent="ⓘ Como funciona?";
+    box.innerHTML="<span>"+h[0]+"</span><br><strong>"+h[1]+"</strong>";
+  };
+  document.getElementById("contextHelpBtn")?.addEventListener("click",function(){
+    const box=document.getElementById("contextHelpBox"),open=box.classList.toggle("open");
+    this.setAttribute("aria-expanded",String(open));this.textContent=open?"Fechar ajuda":"ⓘ Como funciona?";
+  });
+  window.__financeContextHelp(document.querySelector(".side-nav.active[data-view]")?.dataset.view||"dashboard");
 })();
 </script>
 <script id="v29-dashboard-product-script">
