@@ -5204,3 +5204,23 @@ header{background:#071A2D!important}
 </style>
 
 
+
+
+<script id="budget-open-hotfix">
+(function(){
+  function open(cat){
+    if(window.V27Budget&&typeof window.V27Budget.open==="function") return window.V27Budget.open(cat);
+    if(typeof window.openBudgetModal==="function") return window.openBudgetModal(cat);
+  }
+  document.addEventListener("click",function(e){
+    const cat=e.target.closest(".budget-cat-link");
+    if(cat){e.preventDefault();e.stopImmediatePropagation();open(cat.dataset.cat);return}
+    const btn=e.target.closest("#budget .section-title .btn-primary");
+    if(btn){e.preventDefault();e.stopImmediatePropagation();open();}
+  },true);
+  document.addEventListener("keydown",function(e){
+    const cat=e.target.closest?.(".budget-cat-link");
+    if(cat&&(e.key==="Enter"||e.key===" ")){e.preventDefault();e.stopImmediatePropagation();open(cat.dataset.cat)}
+  },true);
+})();
+</script>
