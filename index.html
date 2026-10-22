@@ -1393,6 +1393,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
         <p id="monthLabel"></p><p style="font-size:11px;color:var(--muted);margin-top:3px">Use os meses acima para navegar pelo histórico. Os lançamentos antigos sem data aparecem em “Data não informada”.</p>
       </div>
       <div class="actions">
+        <button class="btn" type="button" onclick="exportBackup()" title="Baixar uma cópia completa e restaurável dos seus dados">Backup completo</button>
         <button class="btn" onclick="exportCSV()">Exportar CSV</button>
         <button class="btn" type="button" onclick="openSmartImport()" title="Importar CSV, OFX ou PDF">📥 Importar</button>
         <button class="btn" type="button" onclick="openCameraImport()" title="Importar comprovante por foto ou print">📷 Importar comprovante</button>
@@ -3793,6 +3794,27 @@ Regras:
   window.deleteWealth=id=>{
     if(!confirm("Excluir este item?")) return;
     state.wealth=state.wealth.filter(w=>w.id!==id); save(); toast("Item excluído.");
+  };
+
+  /* V3.6 — cópia local completa para segurança e futura restauração. */
+  window.exportBackup=()=>{
+    if(!currentUser){toast("Entre na conta antes de gerar o backup.");return}
+    const payload={
+      format:"financas-a-dois-backup",
+      version:1,
+      exportedAt:new Date().toISOString(),
+      profile:JSON.parse(JSON.stringify(accountProfile||{})),
+      data:JSON.parse(JSON.stringify(state))
+    };
+    const date=new Date().toISOString().slice(0,10);
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download="financas-a-dois-backup-"+date+".json";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),0);
+    toast("Backup completo baixado com segurança.");
   };
 
   window.exportCSV=()=>{
