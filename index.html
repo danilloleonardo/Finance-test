@@ -1797,7 +1797,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
       </div>
       <div class="form-actions">
         <button type="button" class="btn" onclick="closeBudgetModal()">Cancelar</button>
-        <button type="button" id="budgetSaveBtn" class="btn btn-primary" onclick="if(window.V27Budget){window.V27Budget.saveBudget(event)}else{window.saveBudgetDirect()}">Salvar</button>
+        <button type="button" id="budgetSaveBtn" class="btn btn-primary" onclick="if(window.V27Budget){window.V27Budget.saveBudget()}else{window.saveBudgetDirect()}">Salvar</button>
       </div>
     </form>
   </div>
@@ -4352,6 +4352,7 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
     refresh:function(){this.smart();this.cards();this.couple()},
     init:function(){var self=this;this.styles();this.addPayer();this.addCouple();this.refresh();document.addEventListener("click",function(e){if(e.target.closest(".month-chip,.tab,.btn"))setTimeout(function(){self.refresh()},40)});var ms=document.getElementById("monthSelect");if(ms)ms.addEventListener("change",function(){setTimeout(function(){self.refresh()},20)})}
   };
+  window.V17=V17;
   setTimeout(function(){V17.init()},0);
   /* /FINANCAS_V17_EXTENSION */
 
@@ -4520,7 +4521,9 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
       host.innerHTML=categories.map(cat=>{const limit=Number(budget[cat]||0),now=Number(used[cat]||0),last=Number(before[cat]||0),pct=limit?Math.min(now/limit*100,100):0,over=limit&&now>limit;
         return '<div class="progress-row v27-budget-row"><div class="progress-head"><span><strong class="budget-cat-link" role="button" tabindex="0" data-cat="'+esc(cat)+'" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">'+esc(cat)+'</strong></span><span class="privacy-value">'+money(now)+(limit?' / '+money(limit):' · sem limite')+'</span></div><div class="v27-budget-meta">Gasto em '+esc(monthName(prev))+': <span class="privacy-value">'+money(last)+'</span></div><div class="bar"><div class="'+(over?'over':'')+'" style="width:'+pct+'%"></div></div></div>';
       }).join("");
-      this.header(prev);if(typeof applyPrivacyState==="function")applyPrivacyState();
+      this.header(prev);
+      if(window.V17&&typeof window.V17.smart==="function")window.V17.smart();
+      if(typeof applyPrivacyState==="function")applyPrivacyState();
     },
     header(prev){
       let box=document.getElementById("v27BudgetHeader"),host=document.getElementById("budgetList");if(!host)return;
@@ -4537,7 +4540,7 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
       document.getElementById("budgetBackdrop").classList.add("open");amount.focus();amount.select();if(typeof applyPrivacyState==="function")applyPrivacyState();
     },
     async saveBudget(e){
-      e.preventDefault();e.stopImmediatePropagation();
+      if(e){e.preventDefault?.();e.stopImmediatePropagation?.();}
       const cat=document.getElementById("bCategory").value;
       const val=parseBRLCents(document.getElementById("bAmount").value);
       if(!cat||!Number.isFinite(val)||val<0){toast("Informe um limite mensal válido.");return}
@@ -4603,7 +4606,9 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
         host.innerHTML=cats.map(cat=>{const limit=Number(budget[cat]||0),now=Number(used[cat]||0),last=Number(before[cat]||0),pct=limit?Math.min(now/limit*100,100):0,over=limit&&now>limit;
           return '<div class="progress-row v27-budget-row"><div class="progress-head"><span><strong class="budget-cat-link" role="button" tabindex="0" data-cat="'+esc(cat)+'" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">'+esc(cat)+'</strong></span><span class="privacy-value">'+money(now)+(limit?' / '+money(limit):' · sem limite')+'</span></div><div class="v27-budget-meta">Gasto em '+esc(monthName(prev))+': <span class="privacy-value">'+money(last)+'</span></div><div class="bar"><div class="'+(over?'over':'')+'" style="width:'+pct+'%"></div></div></div>';
         }).join("");
-        v.header(prev);if(typeof applyPrivacyState==="function")applyPrivacyState();
+        v.header(prev);
+        if(window.V17&&typeof window.V17.smart==="function")window.V17.smart();
+        if(typeof applyPrivacyState==="function")applyPrivacyState();
       };
       v.open=(cat)=>{
         const sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount"),cats=V271.allCategories();
