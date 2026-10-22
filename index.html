@@ -1806,7 +1806,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
 <div id="goalBackdrop" class="modal-backdrop">
   <div class="modal">
     <div class="modal-head">
-      <h3>Nova meta</h3>
+      <h3 id="goalModalTitle">Nova meta</h3>
       <button class="close" onclick="closeGoalModal()">✕</button>
     </div>
     <form id="goalForm">
@@ -1826,7 +1826,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
       </div>
       <div class="form-actions">
         <button type="button" class="btn" onclick="closeGoalModal()">Cancelar</button>
-        <button class="btn btn-primary">Criar meta</button>
+        <button id="goalSaveBtn" class="btn btn-primary">Criar meta</button>
       </div>
     </form>
   </div>
@@ -2805,7 +2805,7 @@ Regras:
           <div class="goal-meta">${money(g.current)} de ${money(g.target)} · ${pct.toFixed(0)}%</div>
           <div class="bar"><div style="width:${pct}%"></div></div>
         </div>
-        <div class="goal-right"><button class="btn btn-danger btn-small" onclick="deleteGoal('${g.id}')">Excluir</button></div>
+        <div class="goal-right" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-small" onclick="openGoalModal('${g.id}')">Editar</button><button class="btn btn-danger btn-small" onclick="deleteGoal('${g.id}')">Excluir</button></div>
       </div>`;
     }).join("");
   }
@@ -3147,8 +3147,24 @@ Regras:
     $("bAmount").select();
   }
   function closeBudgetModal(){$("budgetBackdrop").classList.remove("open")}
-  function openGoalModal(){$("goalBackdrop").classList.add("open");$("gName").focus()}
-  function closeGoalModal(){$("goalBackdrop").classList.remove("open")}
+  let editingGoalId=null;
+  function openGoalModal(id=null){
+    editingGoalId=id||null;
+    const goal=editingGoalId ? state.goals.find(g=>g.id===editingGoalId) : null;
+    $("goalModalTitle").textContent=goal?"Editar meta":"Nova meta";
+    $("goalSaveBtn").textContent=goal?"Salvar alterações":"Criar meta";
+    $("gName").value=goal?.name||"";
+    $("gTarget").value=goal?.target??"";
+    $("gCurrent").value=goal?.current??0;
+    $("goalBackdrop").classList.add("open");
+    $("gName").focus();
+  }
+  function closeGoalModal(){
+    $("goalBackdrop").classList.remove("open");
+    editingGoalId=null;
+    $("goalForm").reset();
+    $("gCurrent").value=0;
+  }
   function openWealthModal(){$("wealthBackdrop").classList.add("open");$("wName").focus()}
   function closeWealthModal(){$("wealthBackdrop").classList.remove("open")}
 
@@ -3338,15 +3354,33 @@ Regras:
     $("bAmount").value=value!==undefined ? formatBRLInput(value) : "";
   });
 
-  $("goalForm").addEventListener("submit",e=>{
+  $("goalForm").addEventListener("submit",async e=>{
     e.preventDefault();
-    state.goals.push({
-      id:crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-      name:$("gName").value.trim(),
-      target:Number($("gTarget").value)||0,
-      current:Number($("gCurrent").value)||0
-    });
-    closeGoalModal(); e.target.reset(); save(); toast("Meta criada!");
+    const name=$("gName").value.trim();
+    const target=Number($("gTarget").value)||0;
+    const current=Number($("gCurrent").value)||0;
+    if(!name || target<=0){toast("Preencha o nome e um valor alvo válido.");return;}
+    const wasEditing=!!editingGoalId;
+    if(wasEditing){
+      const idx=state.goals.findIndex(g=>g.id===editingGoalId);
+      if(idx<0){toast("Não foi possível localizar esta meta.");return;}
+      state.goals[idx]={...state.goals[idx],name,target,current};
+    }else{
+      state.goals.push({
+        id:crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        name,target,current
+      });
+    }
+    if(currentUser) localStorage.setItem(userStorageKey(currentUser.uid),JSON.stringify(state));
+    render();
+    try{
+      if(currentUser && cloudReady && !loadingCloud) await saveCloudState();
+      closeGoalModal();
+      toast(wasEditing?"Meta atualizada!":"Meta criada!");
+    }catch(err){
+      console.error(err);
+      toast("A meta foi alterada neste dispositivo, mas houve erro ao sincronizar.");
+    }
   });
 
   $("wealthForm").addEventListener("submit",e=>{
