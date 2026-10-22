@@ -1797,7 +1797,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
       </div>
       <div class="form-actions">
         <button type="button" class="btn" onclick="closeBudgetModal()">Cancelar</button>
-        <button type="button" id="budgetSaveBtn" class="btn btn-primary" onclick="saveBudgetDirect()">Salvar</button>
+        <button type="submit" id="budgetSaveBtn" class="btn btn-primary">Salvar</button>
       </div>
     </form>
   </div>
@@ -4542,7 +4542,9 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
       const val=parseBRLCents(document.getElementById("bAmount").value);
       if(!cat||!Number.isFinite(val)||val<0){toast("Informe um limite mensal válido.");return}
       this.monthMap(selectedMonth,true)[cat]=val;
-      localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+      if(currentUser) localStorage.setItem(userStorageKey(currentUser.uid),JSON.stringify(state));
+      this.render();
+      closeBudgetModal();
       try{
         if(currentUser&&cloudReady){
           await userRef().collection("settings").doc("main").set({
@@ -4550,12 +4552,10 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
             updatedAt:firebase.firestore.FieldValue.serverTimestamp()
           },{merge:true});
         }
-        this.render();
-        closeBudgetModal();
         toast("Orçamento de "+monthName(selectedMonth)+" atualizado!");
       }catch(err){
-        console.error(err);
-        toast("Orçamento salvo neste dispositivo, mas houve erro ao sincronizar.");
+        console.error("V27Budget.saveBudget",err);
+        toast("Orçamento atualizado neste dispositivo, mas houve erro ao sincronizar.");
       }
     },
     copy(){
