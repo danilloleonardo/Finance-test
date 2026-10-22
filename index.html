@@ -5305,11 +5305,18 @@ header{background:#071A2D!important}
     document.addEventListener("click",event=>{if(event.target.closest(".month-chip,.tab[data-view='budget'],.side-nav[data-view='budget']"))setTimeout(renderSmartBudget,100);});
   }
 
-  function boot(attempt=0){
-    if(!install()&&attempt<80){setTimeout(()=>boot(attempt+1),50);return;}
-    renderSmartBudget();
-  }
-  boot();
+  /*
+    O núcleo é iniciado após a autenticação. Mantemos a ligação aguardando
+    essa inicialização, inclusive quando a pessoa demora para entrar.
+  */
+  const installTimer=setInterval(()=>{
+    if(install()){
+      clearInterval(installTimer);
+      renderSmartBudget();
+    }
+  },200);
+  install();
+  renderSmartBudget();
   const view=document.getElementById("budget");
   if(view)new MutationObserver(()=>setTimeout(renderSmartBudget,0)).observe(view,{childList:true,subtree:true});
 })();
