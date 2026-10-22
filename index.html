@@ -1244,6 +1244,34 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
   #betaAdminBtn{right:88px!important;bottom:18px!important;min-height:42px!important}
 }
 </style>
+
+<style id="mobile-bottom-nav-v1">
+/* Navegação inferior mobile — somente interface; não altera dados nem Firebase. */
+.mobile-bottom-nav{display:none}
+@media(max-width:760px){
+  body{padding-bottom:calc(76px + env(safe-area-inset-bottom, 0px))}
+  .mobile-bottom-nav{
+    position:fixed;left:0;right:0;bottom:0;z-index:120;
+    display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;
+    padding:7px 8px calc(7px + env(safe-area-inset-bottom, 0px));
+    background:rgba(255,255,255,.97);border-top:1px solid var(--border);
+    box-shadow:0 -8px 24px rgba(7,31,24,.10);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)
+  }
+  .mobile-bottom-nav button{
+    min-width:0;min-height:50px;border:0;border-radius:12px;background:transparent;
+    color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;padding:5px 2px;font-size:10px;font-weight:700;line-height:1.1;
+    -webkit-tap-highlight-color:transparent
+  }
+  .mobile-bottom-nav button .mbn-icon{font-size:20px;line-height:1.1}
+  .mobile-bottom-nav button.active{color:var(--navy-800);background:rgba(11,59,46,.09)}
+  .mobile-bottom-nav button:focus-visible{outline:2px solid var(--navy-800);outline-offset:1px}
+  .dark-mode .mobile-bottom-nav{background:rgba(12,24,32,.97);border-top-color:#2b3b48}
+  .dark-mode .mobile-bottom-nav button.active{color:#e9d8b0;background:rgba(173,138,78,.15)}
+  #toast,.toast{bottom:calc(86px + env(safe-area-inset-bottom, 0px))}
+}
+</style>
 </head>
 
 <body>
@@ -5252,6 +5280,47 @@ body.v2022-ai-open #v32AiFab{z-index:1200}
 </style>
 \n
 
+
+<nav id="mobileBottomNav" class="mobile-bottom-nav" aria-label="Navegação principal">
+  <button type="button" data-mobile-view="dashboard" class="active" aria-label="Início" aria-current="page"><span class="mbn-icon" aria-hidden="true">⌂</span><span>Início</span></button>
+  <button type="button" data-mobile-view="transactions" aria-label="Lançamentos"><span class="mbn-icon" aria-hidden="true">＋</span><span>Lançamentos</span></button>
+  <button type="button" data-mobile-view="budget" aria-label="Orçamento"><span class="mbn-icon" aria-hidden="true">◒</span><span>Orçamento</span></button>
+  <button type="button" data-mobile-view="goals" aria-label="Metas"><span class="mbn-icon" aria-hidden="true">◎</span><span>Metas</span></button>
+  <button type="button" id="mobileMoreBtn" aria-label="Mais opções"><span class="mbn-icon" aria-hidden="true">☰</span><span>Mais</span></button>
+</nav>
+<script id="mobile-bottom-nav-controller">
+(function(){
+ const nav=document.getElementById('mobileBottomNav'); if(!nav||nav.dataset.ready==='1')return; nav.dataset.ready='1';
+ function sync(){
+   const active=document.querySelector('.tabs .tab.active');
+   const view=active?.dataset.view||document.querySelector('.side-nav.active')?.dataset.view||'dashboard';
+   nav.querySelectorAll('[data-mobile-view]').forEach(btn=>{
+     const on=btn.dataset.mobileView===view;
+     btn.classList.toggle('active',on);
+     if(on)btn.setAttribute('aria-current','page');else btn.removeAttribute('aria-current');
+   });
+ }
+ nav.addEventListener('click',function(e){
+   const btn=e.target.closest('button'); if(!btn)return;
+   if(btn.id==='mobileMoreBtn'){
+     const opener=document.getElementById('brandMenuBtn');
+     if(opener)opener.click();
+     else document.getElementById('sideDrawer')?.classList.toggle('open');
+     return;
+   }
+   const view=btn.dataset.mobileView; if(!view)return;
+   const tab=document.querySelector('.tabs .tab[data-view="'+view+'"]');
+   const side=document.querySelector('.side-nav[data-view="'+view+'"]');
+   if(tab)tab.click();else if(side)side.click();
+   setTimeout(sync,60);
+ });
+ document.addEventListener('click',e=>{if(e.target.closest('.tab,.side-nav'))setTimeout(sync,50)});
+ const observer=new MutationObserver(sync);
+ document.querySelectorAll('.tabs,.side-menu').forEach(el=>observer.observe(el,{subtree:true,attributes:true,attributeFilter:['class']}));
+ window.addEventListener('resize',sync,{passive:true});
+ sync();
+})();
+</script>
 </body>
 </html>
 
