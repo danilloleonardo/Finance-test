@@ -1792,12 +1792,12 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
         </div>
         <div class="field">
           <label>Limite mensal</label>
-          <input id="bAmount" class="privacy-entry-visible" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00" required>
+          <input id="bAmount" class="privacy-entry-visible" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00" oninput="applyBRLMask(this)" required>
         </div>
       </div>
       <div class="form-actions">
         <button type="button" class="btn" onclick="closeBudgetModal()">Cancelar</button>
-        <button type="button" id="budgetSaveBtn" class="btn btn-primary" onclick="if(window.V27Budget){window.V27Budget.saveBudget()}else{window.saveBudgetDirect()}">Salvar</button>
+        <button type="button" id="budgetSaveBtn" class="btn btn-primary" onclick="saveBudgetDirect()">Salvar</button>
       </div>
     </form>
   </div>
@@ -3350,8 +3350,7 @@ Regras:
 
   $("bAmount")?.addEventListener("input",e=>applyBRLMask(e.target));
   $("bCategory").addEventListener("change",()=>{
-    const map=window.V27Budget?window.V27Budget.monthMap(selectedMonth):state.budgets;
-    const value=map[$("bCategory").value];
+    const value=state.budgets[$("bCategory").value];
     $("bAmount").value=value!==undefined ? formatBRLInput(value) : "";
   });
 
@@ -4340,7 +4339,7 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
   /* FINANCAS_V17_EXTENSION */
   const V17={
     expenses:function(){return transactionsForMonth(selectedMonth).filter(function(t){return t.type==="expense"})},
-    budgetRows:function(){var spent={};this.expenses().forEach(function(t){var k=t.category||"Outros";spent[k]=(spent[k]||0)+Number(t.amount||0)});var b=window.V27Budget?window.V27Budget.monthMap(selectedMonth):((state.monthlyBudgets&&state.monthlyBudgets[selectedMonth])||state.budgets||{});return categories.map(function(cat){var budget=Number((b&&b[cat])||0),used=Number(spent[cat]||0);return {cat:cat,budget:budget,used:used,pct:budget?used/budget*100:0,left:budget-used}}).filter(function(x){return x.budget||x.used})},
+    budgetRows:function(){var spent={};this.expenses().forEach(function(t){var k=t.category||"Outros";spent[k]=(spent[k]||0)+Number(t.amount||0)});var b=(state.budgets&&state.budgets[selectedMonth])||state.budgets||{};return categories.map(function(cat){var budget=Number((b&&b[cat])||0),used=Number(spent[cat]||0);return {cat:cat,budget:budget,used:used,pct:budget?used/budget*100:0,left:budget-used}}).filter(function(x){return x.budget||x.used})},
     recurring:function(){var g={};state.transactions.filter(function(t){return t.type==="expense"}).forEach(function(t){var k=(t.description||"").toLowerCase().replace(/[0-9]+/g,"").trim();if(k)(g[k]||(g[k]=[])).push(t)});return Object.keys(g).map(function(k){var a=g[k],ms={};a.forEach(function(x){ms[x.month||(x.date||"").slice(0,7)]=1});return {a:a,months:Object.keys(ms).length}}).filter(function(x){return x.months>=2}).map(function(x){return {name:x.a[0].description,count:x.a.length,avg:x.a.reduce(function(s,t){return s+Number(t.amount||0)},0)/x.a.length}}).sort(function(a,b){return b.avg-a.avg}).slice(0,6)},
     styles:function(){var s=document.createElement("style");s.textContent=".v17-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}.v17-card{padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--card)}.v17-card b{display:block;font-family:var(--font-display);font-size:20px;margin:6px 0}.v17-k{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:800}.v17-alert{padding:10px 12px;border-radius:10px;margin:7px 0;font-size:12px;border:1px solid var(--border);background:var(--bg)}.v17-warn{background:var(--yellow-bg)}.v17-danger{background:var(--red-bg);color:var(--red)}@media(max-width:700px){.v17-grid{grid-template-columns:1fr}}";document.head.appendChild(s)},
     /* Produção: campo "Quem pagou?" removido do pop-up.
@@ -4353,7 +4352,6 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
     refresh:function(){this.smart();this.cards();this.couple()},
     init:function(){var self=this;this.styles();this.addPayer();this.addCouple();this.refresh();document.addEventListener("click",function(e){if(e.target.closest(".month-chip,.tab,.btn"))setTimeout(function(){self.refresh()},40)});var ms=document.getElementById("monthSelect");if(ms)ms.addEventListener("change",function(){setTimeout(function(){self.refresh()},20)})}
   };
-  window.V17=V17;
   setTimeout(function(){V17.init()},0);
   /* /FINANCAS_V17_EXTENSION */
 
@@ -4504,28 +4502,13 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
     monthOffset(ym,n){const [y,m]=String(ym).split("-").map(Number),d=new Date(y,m-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")},
     monthMap(ym,create=false){
       state.budgets=state.budgets||{};
-      const prefix="__m__"+ym+"__";
-      const out={};
+      if(state.budgets[ym]&&typeof state.budgets[ym]==="object"&&!Array.isArray(state.budgets[ym]))return state.budgets[ym];
+      const legacy={};
       Object.entries(state.budgets).forEach(([k,v])=>{
-        if(k.startsWith(prefix)&&typeof v==="number"&&Number.isFinite(v))out[k.slice(prefix.length)]=v;
+        if(!/^\d{4}-\d{2}$/.test(k)&&typeof v==="number"&&Number.isFinite(v))legacy[k]=v;
       });
-      if(Object.keys(out).length)return out;
-      const nestedLegacy=state.budgets[ym];
-      if(nestedLegacy&&typeof nestedLegacy==="object"&&!Array.isArray(nestedLegacy)){
-        Object.entries(nestedLegacy).forEach(([k,v])=>{if(typeof v==="number"&&Number.isFinite(v))out[k]=v});
-      }
-      if(!Object.keys(out).length){
-        Object.entries(state.budgets).forEach(([k,v])=>{
-          if(!k.startsWith("__m__")&&!/^\d{4}-\d{2}$/.test(k)&&typeof v==="number"&&Number.isFinite(v))out[k]=v;
-        });
-      }
-      return out;
-    },
-    setMonthValue(ym,cat,val){
-      state.budgets=state.budgets||{};
-      state.budgets["__m__"+ym+"__"+cat]=val;
-      state.budgets[cat]=val;
-      return val;
+      if(create){state.budgets[ym]={...legacy};return state.budgets[ym]}
+      return legacy;
     },
     spent(ym){
       const out={};state.transactions.filter(t=>t.type==="expense"&&(t.month||(t.date||"").slice(0,7))===ym)
@@ -4537,9 +4520,7 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
       host.innerHTML=categories.map(cat=>{const limit=Number(budget[cat]||0),now=Number(used[cat]||0),last=Number(before[cat]||0),pct=limit?Math.min(now/limit*100,100):0,over=limit&&now>limit;
         return '<div class="progress-row v27-budget-row"><div class="progress-head"><span><strong class="budget-cat-link" role="button" tabindex="0" data-cat="'+esc(cat)+'" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">'+esc(cat)+'</strong></span><span class="privacy-value">'+money(now)+(limit?' / '+money(limit):' · sem limite')+'</span></div><div class="v27-budget-meta">Gasto em '+esc(monthName(prev))+': <span class="privacy-value">'+money(last)+'</span></div><div class="bar"><div class="'+(over?'over':'')+'" style="width:'+pct+'%"></div></div></div>';
       }).join("");
-      this.header(prev);
-      if(window.V17&&typeof window.V17.smart==="function")window.V17.smart();
-      if(typeof applyPrivacyState==="function")applyPrivacyState();
+      this.header(prev);if(typeof applyPrivacyState==="function")applyPrivacyState();
     },
     header(prev){
       let box=document.getElementById("v27BudgetHeader"),host=document.getElementById("budgetList");if(!host)return;
@@ -4550,20 +4531,18 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
     open(cat){
       const sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount");sel.innerHTML=categories.map(c=>'<option>'+esc(c)+'</option>').join("");if(cat&&categories.includes(cat))sel.value=cat;
       {const current=this.monthMap(selectedMonth)[sel.value];amount.value=current!==undefined?formatBRLInput(current):"";}
-      
+      amount.oninput=function(){applyBRLMask(this)};
       let ref=document.getElementById("v27BudgetReference");if(!ref){ref=document.createElement("div");ref.id="v27BudgetReference";ref.className="v27-budget-reference";amount.closest(".field").after(ref)}
       const prev=this.monthOffset(selectedMonth,-1),last=Number(this.spent(prev)[sel.value]||0);ref.innerHTML='<strong>Referência:</strong> gasto em '+esc(monthName(prev))+' = <span class="privacy-value">'+money(last)+'</span>';
       document.getElementById("budgetBackdrop").classList.add("open");amount.focus();amount.select();if(typeof applyPrivacyState==="function")applyPrivacyState();
     },
     async saveBudget(e){
-      if(e){e.preventDefault?.();e.stopImmediatePropagation?.();}
+      e.preventDefault();e.stopImmediatePropagation();
       const cat=document.getElementById("bCategory").value;
       const val=parseBRLCents(document.getElementById("bAmount").value);
       if(!cat||!Number.isFinite(val)||val<0){toast("Informe um limite mensal válido.");return}
-      this.setMonthValue(selectedMonth,cat,val);
-      if(currentUser) localStorage.setItem(userStorageKey(currentUser.uid),JSON.stringify(state));
-      this.render();
-      closeBudgetModal();
+      this.monthMap(selectedMonth,true)[cat]=val;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
       try{
         if(currentUser&&cloudReady){
           await userRef().collection("settings").doc("main").set({
@@ -4571,15 +4550,16 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
             updatedAt:firebase.firestore.FieldValue.serverTimestamp()
           },{merge:true});
         }
-        if(window.V17&&typeof window.V17.smart==="function")window.V17.smart();
+        this.render();
+        closeBudgetModal();
         toast("Orçamento de "+monthName(selectedMonth)+" atualizado!");
       }catch(err){
-        console.error("V27Budget.saveBudget",err);
-        toast("Orçamento atualizado neste dispositivo, mas houve erro ao sincronizar.");
+        console.error(err);
+        toast("Orçamento salvo neste dispositivo, mas houve erro ao sincronizar.");
       }
     },
     copy(){
-      const prev=this.monthOffset(selectedMonth,-1),before=this.spent(prev);categories.forEach(cat=>this.setMonthValue(selectedMonth,cat,Number(before[cat]||0)));
+      const prev=this.monthOffset(selectedMonth,-1),before=this.spent(prev),map=this.monthMap(selectedMonth,true);categories.forEach(cat=>map[cat]=Number(before[cat]||0));
       save();toast("Orçamento preenchido com os gastos de "+monthName(prev)+".");setTimeout(()=>this.render(),0);
     },
     init(){
@@ -4590,9 +4570,9 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
       if(oldForm){
         const cleanForm=oldForm.cloneNode(true);
         oldForm.replaceWith(cleanForm);
-        cleanForm.addEventListener("submit",e=>{e.preventDefault();this.saveBudget(e)});
+        cleanForm.addEventListener("submit",e=>this.saveBudget(e));
         document.getElementById("bAmount")?.addEventListener("input",e=>applyBRLMask(e.target));
-        document.getElementById("bCategory")?.addEventListener("change",e=>{const sel=e.currentTarget,prev=this.monthOffset(selectedMonth,-1),last=Number(this.spent(prev)[sel.value]||0);{const current=this.monthMap(selectedMonth)[sel.value];document.getElementById("bAmount").value=current!==undefined?formatBRLInput(current):"";}const ref=document.getElementById("v27BudgetReference");if(ref)ref.innerHTML='<strong>Referência:</strong> gasto em '+esc(monthName(prev))+' = <span class="privacy-value">'+money(last)+'</span>';});
+        document.getElementById("bCategory")?.addEventListener("change",e=>{const sel=e.currentTarget,prev=this.monthOffset(selectedMonth,-1),last=Number(this.spent(prev)[sel.value]||0);{const current=this.monthMap(selectedMonth)[sel.value];document.getElementById("bAmount").value=current!==undefined?formatBRLInput(current):"";document.getElementById("bAmount").oninput=function(){applyBRLMask(this)};}const ref=document.getElementById("v27BudgetReference");if(ref)ref.innerHTML='<strong>Referência:</strong> gasto em '+esc(monthName(prev))+' = <span class="privacy-value">'+money(last)+'</span>';});
       }
       document.getElementById("monthSelect")?.addEventListener("change",()=>setTimeout(()=>this.render(),60));document.addEventListener("click",e=>{if(e.target.closest(".month-chip,.tab[data-view='budget']"))setTimeout(()=>this.render(),80)});
       this.render();
@@ -4610,9 +4590,6 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
     allCategories(){
       const set=new Set(Array.isArray(categories)?categories:[]);
       (state.transactions||[]).forEach(t=>{if(t.category)set.add(t.category)});
-      Object.keys(state.budgets||{}).forEach(k=>{
-        if(k.startsWith("__m__")){const parts=k.split("__");if(parts.length>=4&&parts.slice(3).join("__"))set.add(parts.slice(3).join("__"))}
-      });
       Object.values(state.budgets||{}).forEach(b=>{if(b&&typeof b==="object"&&!Array.isArray(b))Object.keys(b).forEach(k=>set.add(k))});
       return Array.from(set).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
     },
@@ -4625,22 +4602,20 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
         host.innerHTML=cats.map(cat=>{const limit=Number(budget[cat]||0),now=Number(used[cat]||0),last=Number(before[cat]||0),pct=limit?Math.min(now/limit*100,100):0,over=limit&&now>limit;
           return '<div class="progress-row v27-budget-row"><div class="progress-head"><span><strong class="budget-cat-link" role="button" tabindex="0" data-cat="'+esc(cat)+'" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">'+esc(cat)+'</strong></span><span class="privacy-value">'+money(now)+(limit?' / '+money(limit):' · sem limite')+'</span></div><div class="v27-budget-meta">Gasto em '+esc(monthName(prev))+': <span class="privacy-value">'+money(last)+'</span></div><div class="bar"><div class="'+(over?'over':'')+'" style="width:'+pct+'%"></div></div></div>';
         }).join("");
-        v.header(prev);
-        if(window.V17&&typeof window.V17.smart==="function")window.V17.smart();
-        if(typeof applyPrivacyState==="function")applyPrivacyState();
+        v.header(prev);if(typeof applyPrivacyState==="function")applyPrivacyState();
       };
       v.open=(cat)=>{
         const sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount"),cats=V271.allCategories();
         sel.innerHTML=cats.map(c=>'<option>'+esc(c)+'</option>').join("");if(cat&&cats.includes(cat))sel.value=cat;
         {const current=v.monthMap(selectedMonth)[sel.value];amount.value=current!==undefined?formatBRLInput(current):"";}
-        
+        amount.oninput=function(){applyBRLMask(this)};
         let ref=document.getElementById("v27BudgetReference");if(!ref){ref=document.createElement("div");ref.id="v27BudgetReference";ref.className="v27-budget-reference";amount.closest(".field").after(ref)}
         const prev=v.monthOffset(selectedMonth,-1),last=Number(v.spent(prev)[sel.value]||0);ref.innerHTML='<strong>Referência:</strong> gasto em '+esc(monthName(prev))+' = <span class="privacy-value">'+money(last)+'</span>';
         document.getElementById("budgetBackdrop").classList.add("open");amount.focus();amount.select();if(typeof applyPrivacyState==="function")applyPrivacyState();
       };
       v.copy=()=>{
         const prev=v.monthOffset(selectedMonth,-1),before=v.spent(prev),map=v.monthMap(selectedMonth,true);
-        V271.allCategories().forEach(cat=>v.setMonthValue(selectedMonth,cat,Number(before[cat]||0)));save();toast("Orçamento preenchido com os gastos de "+monthName(prev)+".");setTimeout(()=>v.render(),0);
+        V271.allCategories().forEach(cat=>map[cat]=Number(before[cat]||0));save();toast("Orçamento preenchido com os gastos de "+monthName(prev)+".");setTimeout(()=>v.render(),0);
       };
       renderBudget=()=>v.render();openBudgetModal=(cat)=>v.open(cat);window.openBudgetModal=openBudgetModal;
       v.render();
@@ -5228,108 +5203,4 @@ header{background:#071A2D!important}
 #firebaseStatus,.toast{background:#0A2036!important}
 </style>
 
-<script id="v34-budget-single-controller">
-(function(){
-  const PREFIX="__m__";
-  function monthKey(){return selectedMonth}
-  function allCats(){
-    const set=new Set(Array.isArray(categories)?categories:[]);
-    (state.transactions||[]).forEach(t=>{if(t.category)set.add(t.category)});
-    Object.keys(state.budgets||{}).forEach(k=>{
-      if(k.startsWith(PREFIX)){
-        const m=k.match(/^__m__\d{4}-\d{2}__(.+)$/);if(m&&m[1])set.add(m[1]);
-      }else if(!/^\d{4}-\d{2}$/.test(k)) set.add(k);
-    });
-    return [...set].filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
-  }
-  function limits(ym=monthKey()){
-    state.budgets=state.budgets||{};
-    const out={},prefix=PREFIX+ym+"__";
-    Object.entries(state.budgets).forEach(([k,v])=>{
-      if(k.startsWith(prefix)&&typeof v==="number"&&Number.isFinite(v))out[k.slice(prefix.length)]=v;
-    });
-    if(Object.keys(out).length)return out;
-    const nested=state.budgets[ym];
-    if(nested&&typeof nested==="object"&&!Array.isArray(nested)){
-      Object.entries(nested).forEach(([k,v])=>{if(typeof v==="number"&&Number.isFinite(v))out[k]=v});
-    }
-    if(!Object.keys(out).length){
-      Object.entries(state.budgets).forEach(([k,v])=>{
-        if(!k.startsWith(PREFIX)&&!/^\d{4}-\d{2}$/.test(k)&&typeof v==="number"&&Number.isFinite(v))out[k]=v;
-      });
-    }
-    return out;
-  }
-  function spent(ym=monthKey()){
-    const out={};
-    transactionsForMonth(ym).filter(t=>t.type==="expense").forEach(t=>{
-      const c=t.category||"Outros";out[c]=(out[c]||0)+Number(t.amount||0);
-    });
-    return out;
-  }
-  function setLimit(cat,val){
-    state.budgets=state.budgets||{};
-    state.budgets[PREFIX+monthKey()+"__"+cat]=val;
-    state.budgets[cat]=val; // compatibilidade com dashboard/CFO legado
-  }
-  function render(){
-    const list=document.getElementById("budgetList"),summary=document.getElementById("v31BudgetSummary");
-    if(!list||!summary)return;
-    const lm=limits(),sp=spent(),cs=allCats();
-    let planned=0,used=0;
-    cs.forEach(c=>{planned+=Number(lm[c]||0);used+=Number(sp[c]||0)});
-    const left=planned-used,pct=planned?used/planned*100:0;
-    summary.innerHTML=
-      '<div class="v31-budget-kpi"><small>Orçado</small><strong class="privacy-value">'+money(planned)+'</strong></div>'+
-      '<div class="v31-budget-kpi"><small>Disponível</small><strong class="privacy-value '+(left<0?'negative':'positive')+'">'+money(Math.max(0,left))+'</strong></div>'+
-      '<div class="v31-budget-kpi"><small>Projeção do mês</small><strong class="privacy-value">'+money(used)+'</strong></div>'+
-      '<div class="v31-budget-status" style="grid-column:1/-1"><strong>'+Math.round(pct)+'% utilizado</strong> · '+(planned?(pct>100?'Orçamento mensal ultrapassado.':pct>=80?'Atenção: próximo do limite do mês.':'Dentro do planejamento do mês.'):'Defina limites por categoria para acompanhar o mês.')+'</div>';
-    list.innerHTML=cs.map(c=>{
-      const b=Number(lm[c]||0),u=Number(sp[c]||0),p=b?Math.min(100,u/b*100):0;
-      return '<div class="v27-budget-row"><div class="v27-budget-row-top"><button type="button" class="budget-cat-link" data-budget-cat="'+esc(c)+'">'+esc(c)+'</button><span class="privacy-value">'+money(u)+' · '+(b?money(b):'sem orçamento')+'</span></div><div class="v27-budget-track"><div class="v27-budget-fill '+(b&&u>b?'danger':b&&u/b>=.8?'warn':'')+'" style="width:'+p+'%"></div></div></div>';
-    }).join("");
-    if(typeof applyPrivacyState==="function")applyPrivacyState();
-  }
-  function open(cat){
-    const back=document.getElementById("budgetBackdrop"),sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount");
-    if(!back||!sel||!amount)return;
-    const cs=allCats();sel.innerHTML=cs.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join("");
-    if(cat&&cs.includes(cat))sel.value=cat;
-    const v=limits()[sel.value];amount.value=v!==undefined?formatBRLInput(v):"";
-    back.classList.add("open");setTimeout(()=>{amount.focus();amount.select()},0);
-  }
-  async function persist(){
-    const sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount");if(!sel||!amount)return;
-    const cat=sel.value,val=parseBRLCents(amount.value);
-    if(!cat||!Number.isFinite(val)||val<0){toast("Informe um limite mensal válido.");return}
-    setLimit(cat,val);
-    if(currentUser)localStorage.setItem(userStorageKey(currentUser.uid),JSON.stringify(state));
-    render();closeBudgetModal();
-    try{
-      if(currentUser&&cloudReady){
-        await userRef().collection("settings").doc("main").set({budgets:state.budgets,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-      }
-      toast("Orçamento de "+monthName(monthKey())+" atualizado!");
-    }catch(err){console.error("BudgetSingleController",err);toast("Orçamento atualizado neste dispositivo, mas houve erro ao sincronizar.");}
-  }
-  function install(){
-    const form=document.getElementById("budgetForm"),amount=document.getElementById("bAmount"),sel=document.getElementById("bCategory"),saveBtn=document.getElementById("budgetSaveBtn");
-    window.openBudgetModal=open;
-    window.BudgetController={render,open,save:persist,limits,spent};
-    if(form){form.onsubmit=e=>{e.preventDefault();e.stopImmediatePropagation();persist()}}
-    if(saveBtn){saveBtn.type="button";saveBtn.onclick=e=>{e.preventDefault();e.stopImmediatePropagation();persist()}}
-    if(amount){amount.oninput=null;amount.addEventListener("input",()=>applyBRLMask(amount))}
-    if(sel)sel.onchange=()=>{const v=limits()[sel.value];amount.value=v!==undefined?formatBRLInput(v):""};
-    document.addEventListener("click",e=>{
-      const link=e.target.closest("[data-budget-cat]");
-      if(link){e.preventDefault();e.stopImmediatePropagation();open(link.dataset.budgetCat);return}
-      const def=e.target.closest("#budget .section-title .btn-primary");
-      if(def){e.preventDefault();e.stopImmediatePropagation();open()}
-    },true);
-    const month=document.getElementById("monthSelect");
-    if(month)month.addEventListener("change",()=>setTimeout(render,60));
-    setTimeout(render,0);
-  }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
-})();
-</script>
+
