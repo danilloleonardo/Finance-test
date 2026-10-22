@@ -5149,88 +5149,7 @@ body.v2022-ai-open #v32AiFab{z-index:1200}
 }
 </style>
 \n
-<script id="v34-budget-canonical-fix">
-(function(){
-  /* V3.4 — camada canônica de Orçamento. Mantém UI/dados existentes e neutraliza conflitos legados. */
-  function B(){return window.V27Budget}
-  function cats(){
-    if(window.V271&&typeof V271.allCategories==="function")return V271.allCategories();
-    return Array.isArray(window.categories)?categories:[];
-  }
-  function map(){return B()?B().monthMap(selectedMonth):{}}
-  function refreshSummary(){
-    const host=document.getElementById("v31BudgetSummary"),v=B();if(!host||!v)return;
-    const limits=map(),used=v.spent(selectedMonth)||{};
-    const planned=Object.values(limits).reduce((a,x)=>a+(Number(x)||0),0);
-    const spent=Object.values(used).reduce((a,x)=>a+(Number(x)||0),0);
-    const left=planned-spent,pct=planned?spent/planned*100:0;
-    host.innerHTML='<div class="v31-budget-kpi"><small>Orçamento do mês</small><strong class="privacy-value">'+money(planned)+'</strong></div>'+
-      '<div class="v31-budget-kpi"><small>Já utilizado</small><strong class="privacy-value">'+money(spent)+'</strong></div>'+
-      '<div class="v31-budget-kpi"><small>'+(left>=0?'Ainda disponível':'Acima do orçamento')+'</small><strong class="privacy-value '+(left<0?'negative':'positive')+'">'+money(Math.abs(left))+'</strong></div>'+
-      '<div class="v31-budget-status" style="grid-column:1/-1"><strong>'+Math.round(pct)+'% utilizado</strong> · '+(planned?(pct>100?'Seu orçamento mensal foi ultrapassado.':pct>=80?'Atenção: você está próximo do limite do mês.':'Você ainda está dentro do planejamento.'):'Defina limites por categoria para acompanhar o mês.')+'</div>';
-    if(typeof applyPrivacyState==="function")applyPrivacyState();
-  }
-  function open(cat){
-    const v=B(),sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount"),back=document.getElementById("budgetBackdrop");
-    if(!v||!sel||!amount||!back)return;
-    const all=cats();sel.innerHTML=all.map(c=>'<option>'+esc(c)+'</option>').join("");
-    if(cat&&all.includes(cat))sel.value=cat;
-    const current=map()[sel.value];
-    amount.value=current!==undefined?formatBRLInput(current):"";
-    back.classList.add("open");
-    setTimeout(()=>{amount.focus();amount.select()},0);
-  }
-  async function saveBudget(){
-    const v=B(),sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount");
-    if(!v||!sel||!amount)return;
-    const cat=sel.value,val=parseBRLCents(amount.value);
-    if(!cat||!Number.isFinite(val)||val<0){toast("Informe um limite mensal válido.");return}
-    v.setMonthValue(selectedMonth,cat,val);
-    if(currentUser)localStorage.setItem(userStorageKey(currentUser.uid),JSON.stringify(state));
-    v.render();refreshSummary();closeBudgetModal();
-    try{
-      if(currentUser&&cloudReady){
-        await userRef().collection("settings").doc("main").set({
-          budgets:state.budgets,
-          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-        },{merge:true});
-      }
-      toast("Orçamento de "+monthName(selectedMonth)+" atualizado!");
-    }catch(err){
-      console.error("V34Budget.save",err);
-      toast("Orçamento atualizado neste dispositivo, mas houve erro ao sincronizar.");
-    }
-  }
-  function install(){
-    if(!B())return setTimeout(install,80);
-    window.openBudgetModal=open;
-    window.V34Budget={open,save:saveBudget,summary:refreshSummary};
-    const btn=document.getElementById("budgetSaveBtn");
-    if(btn){btn.type="button";btn.onclick=saveBudget}
-    const amount=document.getElementById("bAmount");
-    if(amount){
-      const clean=amount.cloneNode(true);amount.replaceWith(clean);
-      clean.addEventListener("input",()=>applyBRLMask(clean));
-    }
-    const sel=document.getElementById("bCategory");
-    if(sel)sel.onchange=()=>{const a=document.getElementById("bAmount"),v=map()[sel.value];a.value=v!==undefined?formatBRLInput(v):""};
-    document.addEventListener("click",e=>{
-      const link=e.target.closest("#budgetList .budget-cat-link");
-      if(link){e.preventDefault();e.stopImmediatePropagation();open(link.dataset.cat);return}
-      if(e.target.closest("#budget .section-title .btn-primary")){e.preventDefault();e.stopImmediatePropagation();open()}
-    },true);
-    document.addEventListener("keydown",e=>{
-      const link=e.target.closest?.("#budgetList .budget-cat-link");
-      if(link&&(e.key==="Enter"||e.key===" ")){e.preventDefault();e.stopImmediatePropagation();open(link.dataset.cat)}
-    },true);
-    const oldRender=B().render.bind(B());
-    B().render=function(){oldRender();refreshSummary()};
-    B().render();
-    document.getElementById("monthSelect")?.addEventListener("change",()=>setTimeout(()=>B().render(),100));
-  }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
-})();
-</script>
+
 </body>
 </html>
 
@@ -5308,3 +5227,109 @@ header{background:#071A2D!important}
 .ai-assistant{background:linear-gradient(145deg,#103B61,#0D2945)!important}
 #firebaseStatus,.toast{background:#0A2036!important}
 </style>
+
+<script id="v34-budget-single-controller">
+(function(){
+  const PREFIX="__m__";
+  function monthKey(){return selectedMonth}
+  function allCats(){
+    const set=new Set(Array.isArray(categories)?categories:[]);
+    (state.transactions||[]).forEach(t=>{if(t.category)set.add(t.category)});
+    Object.keys(state.budgets||{}).forEach(k=>{
+      if(k.startsWith(PREFIX)){
+        const m=k.match(/^__m__\d{4}-\d{2}__(.+)$/);if(m&&m[1])set.add(m[1]);
+      }else if(!/^\d{4}-\d{2}$/.test(k)) set.add(k);
+    });
+    return [...set].filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  }
+  function limits(ym=monthKey()){
+    state.budgets=state.budgets||{};
+    const out={},prefix=PREFIX+ym+"__";
+    Object.entries(state.budgets).forEach(([k,v])=>{
+      if(k.startsWith(prefix)&&typeof v==="number"&&Number.isFinite(v))out[k.slice(prefix.length)]=v;
+    });
+    if(Object.keys(out).length)return out;
+    const nested=state.budgets[ym];
+    if(nested&&typeof nested==="object"&&!Array.isArray(nested)){
+      Object.entries(nested).forEach(([k,v])=>{if(typeof v==="number"&&Number.isFinite(v))out[k]=v});
+    }
+    if(!Object.keys(out).length){
+      Object.entries(state.budgets).forEach(([k,v])=>{
+        if(!k.startsWith(PREFIX)&&!/^\d{4}-\d{2}$/.test(k)&&typeof v==="number"&&Number.isFinite(v))out[k]=v;
+      });
+    }
+    return out;
+  }
+  function spent(ym=monthKey()){
+    const out={};
+    transactionsForMonth(ym).filter(t=>t.type==="expense").forEach(t=>{
+      const c=t.category||"Outros";out[c]=(out[c]||0)+Number(t.amount||0);
+    });
+    return out;
+  }
+  function setLimit(cat,val){
+    state.budgets=state.budgets||{};
+    state.budgets[PREFIX+monthKey()+"__"+cat]=val;
+    state.budgets[cat]=val; // compatibilidade com dashboard/CFO legado
+  }
+  function render(){
+    const list=document.getElementById("budgetList"),summary=document.getElementById("v31BudgetSummary");
+    if(!list||!summary)return;
+    const lm=limits(),sp=spent(),cs=allCats();
+    let planned=0,used=0;
+    cs.forEach(c=>{planned+=Number(lm[c]||0);used+=Number(sp[c]||0)});
+    const left=planned-used,pct=planned?used/planned*100:0;
+    summary.innerHTML=
+      '<div class="v31-budget-kpi"><small>Orçado</small><strong class="privacy-value">'+money(planned)+'</strong></div>'+
+      '<div class="v31-budget-kpi"><small>Disponível</small><strong class="privacy-value '+(left<0?'negative':'positive')+'">'+money(Math.max(0,left))+'</strong></div>'+
+      '<div class="v31-budget-kpi"><small>Projeção do mês</small><strong class="privacy-value">'+money(used)+'</strong></div>'+
+      '<div class="v31-budget-status" style="grid-column:1/-1"><strong>'+Math.round(pct)+'% utilizado</strong> · '+(planned?(pct>100?'Orçamento mensal ultrapassado.':pct>=80?'Atenção: próximo do limite do mês.':'Dentro do planejamento do mês.'):'Defina limites por categoria para acompanhar o mês.')+'</div>';
+    list.innerHTML=cs.map(c=>{
+      const b=Number(lm[c]||0),u=Number(sp[c]||0),p=b?Math.min(100,u/b*100):0;
+      return '<div class="v27-budget-row"><div class="v27-budget-row-top"><button type="button" class="budget-cat-link" data-budget-cat="'+esc(c)+'">'+esc(c)+'</button><span class="privacy-value">'+money(u)+' · '+(b?money(b):'sem orçamento')+'</span></div><div class="v27-budget-track"><div class="v27-budget-fill '+(b&&u>b?'danger':b&&u/b>=.8?'warn':'')+'" style="width:'+p+'%"></div></div></div>';
+    }).join("");
+    if(typeof applyPrivacyState==="function")applyPrivacyState();
+  }
+  function open(cat){
+    const back=document.getElementById("budgetBackdrop"),sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount");
+    if(!back||!sel||!amount)return;
+    const cs=allCats();sel.innerHTML=cs.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join("");
+    if(cat&&cs.includes(cat))sel.value=cat;
+    const v=limits()[sel.value];amount.value=v!==undefined?formatBRLInput(v):"";
+    back.classList.add("open");setTimeout(()=>{amount.focus();amount.select()},0);
+  }
+  async function persist(){
+    const sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount");if(!sel||!amount)return;
+    const cat=sel.value,val=parseBRLCents(amount.value);
+    if(!cat||!Number.isFinite(val)||val<0){toast("Informe um limite mensal válido.");return}
+    setLimit(cat,val);
+    if(currentUser)localStorage.setItem(userStorageKey(currentUser.uid),JSON.stringify(state));
+    render();closeBudgetModal();
+    try{
+      if(currentUser&&cloudReady){
+        await userRef().collection("settings").doc("main").set({budgets:state.budgets,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      }
+      toast("Orçamento de "+monthName(monthKey())+" atualizado!");
+    }catch(err){console.error("BudgetSingleController",err);toast("Orçamento atualizado neste dispositivo, mas houve erro ao sincronizar.");}
+  }
+  function install(){
+    const form=document.getElementById("budgetForm"),amount=document.getElementById("bAmount"),sel=document.getElementById("bCategory"),saveBtn=document.getElementById("budgetSaveBtn");
+    window.openBudgetModal=open;
+    window.BudgetController={render,open,save:persist,limits,spent};
+    if(form){form.onsubmit=e=>{e.preventDefault();e.stopImmediatePropagation();persist()}}
+    if(saveBtn){saveBtn.type="button";saveBtn.onclick=e=>{e.preventDefault();e.stopImmediatePropagation();persist()}}
+    if(amount){amount.oninput=null;amount.addEventListener("input",()=>applyBRLMask(amount))}
+    if(sel)sel.onchange=()=>{const v=limits()[sel.value];amount.value=v!==undefined?formatBRLInput(v):""};
+    document.addEventListener("click",e=>{
+      const link=e.target.closest("[data-budget-cat]");
+      if(link){e.preventDefault();e.stopImmediatePropagation();open(link.dataset.budgetCat);return}
+      const def=e.target.closest("#budget .section-title .btn-primary");
+      if(def){e.preventDefault();e.stopImmediatePropagation();open()}
+    },true);
+    const month=document.getElementById("monthSelect");
+    if(month)month.addEventListener("change",()=>setTimeout(render,60));
+    setTimeout(render,0);
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
+})();
+</script>
