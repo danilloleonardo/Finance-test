@@ -1792,7 +1792,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
         </div>
         <div class="field">
           <label>Limite mensal</label>
-          <input id="bAmount" class="privacy-entry-visible" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00" oninput="applyBRLMask(this)" required>
+          <input id="bAmount" class="privacy-entry-visible" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00" required>
         </div>
       </div>
       <div class="form-actions">
@@ -2065,7 +2065,6 @@ Regras:
     try{
       await userRef().collection("settings").doc("main").set({
         budgets: state.budgets || {},
-        monthlyBudgets: state.monthlyBudgets || {},
         goals: state.goals || [],
         wealth: state.wealth || [],
         cards: state.cards || [],
@@ -2117,7 +2116,6 @@ Regras:
         }
         await userRef().collection("settings").doc("main").set({
           budgets: state.budgets || {},
-          monthlyBudgets: state.monthlyBudgets || {},
           goals: state.goals || [],
           wealth: state.wealth || [],
           cards: state.cards || [],
@@ -2127,7 +2125,6 @@ Regras:
         state.transactions = txSnap.docs.map(d => ({id:d.id, ...d.data()}));
         const settings = settingsSnap.exists ? settingsSnap.data() : {};
         state.budgets = settings.budgets || {};
-        state.monthlyBudgets = settings.monthlyBudgets || {};
         state.goals = settings.goals || [];
         state.wealth = settings.wealth || [];
         state.cards = settings.cards || state.cards || [];
@@ -3144,7 +3141,7 @@ Regras:
   function openBudgetModal(cat){
     $("bCategory").innerHTML=categories.map(c=>`<option>${esc(c)}</option>`).join("");
     if(cat && categories.includes(cat)) $("bCategory").value=cat;
-    {const map=(state.budgets[selectedMonth]&&typeof state.budgets[selectedMonth]==="object")?state.budgets[selectedMonth]:state.budgets;const current=map[$("bCategory").value];$("bAmount").value=current!==undefined?formatBRLInput(current):"";}
+    {const map=window.V27Budget?window.V27Budget.monthMap(selectedMonth):state.budgets;const current=map[$("bCategory").value];$("bAmount").value=current!==undefined?formatBRLInput(current):"";}
     $("budgetBackdrop").classList.add("open");
     $("bAmount").focus();
     $("bAmount").select();
@@ -3353,7 +3350,8 @@ Regras:
 
   $("bAmount")?.addEventListener("input",e=>applyBRLMask(e.target));
   $("bCategory").addEventListener("change",()=>{
-    const value=state.budgets[$("bCategory").value];
+    const map=window.V27Budget?window.V27Budget.monthMap(selectedMonth):state.budgets;
+    const value=map[$("bCategory").value];
     $("bAmount").value=value!==undefined ? formatBRLInput(value) : "";
   });
 
@@ -4506,19 +4504,28 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
     monthOffset(ym,n){const [y,m]=String(ym).split("-").map(Number),d=new Date(y,m-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")},
     monthMap(ym,create=false){
       state.budgets=state.budgets||{};
-      state.monthlyBudgets=state.monthlyBudgets||{};
-      if(state.monthlyBudgets[ym]&&typeof state.monthlyBudgets[ym]==="object"&&!Array.isArray(state.monthlyBudgets[ym]))return state.monthlyBudgets[ym];
+      const prefix="__m__"+ym+"__";
+      const out={};
+      Object.entries(state.budgets).forEach(([k,v])=>{
+        if(k.startsWith(prefix)&&typeof v==="number"&&Number.isFinite(v))out[k.slice(prefix.length)]=v;
+      });
+      if(Object.keys(out).length)return out;
       const nestedLegacy=state.budgets[ym];
-      const legacy={};
       if(nestedLegacy&&typeof nestedLegacy==="object"&&!Array.isArray(nestedLegacy)){
-        Object.entries(nestedLegacy).forEach(([k,v])=>{if(typeof v==="number"&&Number.isFinite(v))legacy[k]=v});
-      }else{
+        Object.entries(nestedLegacy).forEach(([k,v])=>{if(typeof v==="number"&&Number.isFinite(v))out[k]=v});
+      }
+      if(!Object.keys(out).length){
         Object.entries(state.budgets).forEach(([k,v])=>{
-          if(!/^\d{4}-\d{2}$/.test(k)&&typeof v==="number"&&Number.isFinite(v))legacy[k]=v;
+          if(!k.startsWith("__m__")&&!/^\d{4}-\d{2}$/.test(k)&&typeof v==="number"&&Number.isFinite(v))out[k]=v;
         });
       }
-      if(create){state.monthlyBudgets[ym]={...legacy};return state.monthlyBudgets[ym]}
-      return legacy;
+      return out;
+    },
+    setMonthValue(ym,cat,val){
+      state.budgets=state.budgets||{};
+      state.budgets["__m__"+ym+"__"+cat]=val;
+      state.budgets[cat]=val;
+      return val;
     },
     spent(ym){
       const out={};state.transactions.filter(t=>t.type==="expense"&&(t.month||(t.date||"").slice(0,7))===ym)
@@ -4543,7 +4550,7 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
     open(cat){
       const sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount");sel.innerHTML=categories.map(c=>'<option>'+esc(c)+'</option>').join("");if(cat&&categories.includes(cat))sel.value=cat;
       {const current=this.monthMap(selectedMonth)[sel.value];amount.value=current!==undefined?formatBRLInput(current):"";}
-      amount.oninput=function(){applyBRLMask(this)};
+      
       let ref=document.getElementById("v27BudgetReference");if(!ref){ref=document.createElement("div");ref.id="v27BudgetReference";ref.className="v27-budget-reference";amount.closest(".field").after(ref)}
       const prev=this.monthOffset(selectedMonth,-1),last=Number(this.spent(prev)[sel.value]||0);ref.innerHTML='<strong>Referência:</strong> gasto em '+esc(monthName(prev))+' = <span class="privacy-value">'+money(last)+'</span>';
       document.getElementById("budgetBackdrop").classList.add("open");amount.focus();amount.select();if(typeof applyPrivacyState==="function")applyPrivacyState();
@@ -4553,10 +4560,7 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
       const cat=document.getElementById("bCategory").value;
       const val=parseBRLCents(document.getElementById("bAmount").value);
       if(!cat||!Number.isFinite(val)||val<0){toast("Informe um limite mensal válido.");return}
-      const monthBudget=this.monthMap(selectedMonth,true);
-      monthBudget[cat]=val;
-      state.budgets=state.budgets||{};
-      state.budgets[cat]=val;
+      this.setMonthValue(selectedMonth,cat,val);
       if(currentUser) localStorage.setItem(userStorageKey(currentUser.uid),JSON.stringify(state));
       this.render();
       closeBudgetModal();
@@ -4564,7 +4568,6 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
         if(currentUser&&cloudReady){
           await userRef().collection("settings").doc("main").set({
             budgets:state.budgets,
-            monthlyBudgets:state.monthlyBudgets,
             updatedAt:firebase.firestore.FieldValue.serverTimestamp()
           },{merge:true});
         }
@@ -4576,7 +4579,7 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
       }
     },
     copy(){
-      const prev=this.monthOffset(selectedMonth,-1),before=this.spent(prev),map=this.monthMap(selectedMonth,true);categories.forEach(cat=>map[cat]=Number(before[cat]||0));
+      const prev=this.monthOffset(selectedMonth,-1),before=this.spent(prev);categories.forEach(cat=>this.setMonthValue(selectedMonth,cat,Number(before[cat]||0)));
       save();toast("Orçamento preenchido com os gastos de "+monthName(prev)+".");setTimeout(()=>this.render(),0);
     },
     init(){
@@ -4589,7 +4592,7 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
         oldForm.replaceWith(cleanForm);
         cleanForm.addEventListener("submit",e=>{e.preventDefault();this.saveBudget(e)});
         document.getElementById("bAmount")?.addEventListener("input",e=>applyBRLMask(e.target));
-        document.getElementById("bCategory")?.addEventListener("change",e=>{const sel=e.currentTarget,prev=this.monthOffset(selectedMonth,-1),last=Number(this.spent(prev)[sel.value]||0);{const current=this.monthMap(selectedMonth)[sel.value];document.getElementById("bAmount").value=current!==undefined?formatBRLInput(current):"";document.getElementById("bAmount").oninput=function(){applyBRLMask(this)};}const ref=document.getElementById("v27BudgetReference");if(ref)ref.innerHTML='<strong>Referência:</strong> gasto em '+esc(monthName(prev))+' = <span class="privacy-value">'+money(last)+'</span>';});
+        document.getElementById("bCategory")?.addEventListener("change",e=>{const sel=e.currentTarget,prev=this.monthOffset(selectedMonth,-1),last=Number(this.spent(prev)[sel.value]||0);{const current=this.monthMap(selectedMonth)[sel.value];document.getElementById("bAmount").value=current!==undefined?formatBRLInput(current):"";}const ref=document.getElementById("v27BudgetReference");if(ref)ref.innerHTML='<strong>Referência:</strong> gasto em '+esc(monthName(prev))+' = <span class="privacy-value">'+money(last)+'</span>';});
       }
       document.getElementById("monthSelect")?.addEventListener("change",()=>setTimeout(()=>this.render(),60));document.addEventListener("click",e=>{if(e.target.closest(".month-chip,.tab[data-view='budget']"))setTimeout(()=>this.render(),80)});
       this.render();
@@ -4607,7 +4610,9 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
     allCategories(){
       const set=new Set(Array.isArray(categories)?categories:[]);
       (state.transactions||[]).forEach(t=>{if(t.category)set.add(t.category)});
-      Object.values(state.monthlyBudgets||{}).forEach(b=>{if(b&&typeof b==="object"&&!Array.isArray(b))Object.keys(b).forEach(k=>set.add(k))});
+      Object.keys(state.budgets||{}).forEach(k=>{
+        if(k.startsWith("__m__")){const parts=k.split("__");if(parts.length>=4&&parts.slice(3).join("__"))set.add(parts.slice(3).join("__"))}
+      });
       Object.values(state.budgets||{}).forEach(b=>{if(b&&typeof b==="object"&&!Array.isArray(b))Object.keys(b).forEach(k=>set.add(k))});
       return Array.from(set).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
     },
@@ -4628,14 +4633,14 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
         const sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount"),cats=V271.allCategories();
         sel.innerHTML=cats.map(c=>'<option>'+esc(c)+'</option>').join("");if(cat&&cats.includes(cat))sel.value=cat;
         {const current=v.monthMap(selectedMonth)[sel.value];amount.value=current!==undefined?formatBRLInput(current):"";}
-        amount.oninput=function(){applyBRLMask(this)};
+        
         let ref=document.getElementById("v27BudgetReference");if(!ref){ref=document.createElement("div");ref.id="v27BudgetReference";ref.className="v27-budget-reference";amount.closest(".field").after(ref)}
         const prev=v.monthOffset(selectedMonth,-1),last=Number(v.spent(prev)[sel.value]||0);ref.innerHTML='<strong>Referência:</strong> gasto em '+esc(monthName(prev))+' = <span class="privacy-value">'+money(last)+'</span>';
         document.getElementById("budgetBackdrop").classList.add("open");amount.focus();amount.select();if(typeof applyPrivacyState==="function")applyPrivacyState();
       };
       v.copy=()=>{
         const prev=v.monthOffset(selectedMonth,-1),before=v.spent(prev),map=v.monthMap(selectedMonth,true);
-        V271.allCategories().forEach(cat=>map[cat]=Number(before[cat]||0));save();toast("Orçamento preenchido com os gastos de "+monthName(prev)+".");setTimeout(()=>v.render(),0);
+        V271.allCategories().forEach(cat=>v.setMonthValue(selectedMonth,cat,Number(before[cat]||0)));save();toast("Orçamento preenchido com os gastos de "+monthName(prev)+".");setTimeout(()=>v.render(),0);
       };
       renderBudget=()=>v.render();openBudgetModal=(cat)=>v.open(cat);window.openBudgetModal=openBudgetModal;
       v.render();
