@@ -5209,9 +5209,23 @@ header{background:#071A2D!important}
 <script id="budget-open-hotfix">
 (function(){
   function open(cat){
-    if(window.V27Budget&&typeof window.V27Budget.open==="function") return window.V27Budget.open(cat);
-    if(typeof window.openBudgetModal==="function") return window.openBudgetModal(cat);
+    const back=document.getElementById("budgetBackdrop");
+    const sel=document.getElementById("bCategory");
+    const amount=document.getElementById("bAmount");
+    if(!back||!sel||!amount)return;
+    const cats=(window.V271&&typeof window.V271.allCategories==="function")
+      ? window.V271.allCategories()
+      : (Array.isArray(window.categories)?window.categories:[]);
+    sel.innerHTML=cats.map(c=>'<option>'+esc(c)+'</option>').join("");
+    if(cat&&cats.includes(cat))sel.value=cat;
+    let map=state.budgets||{};
+    if(window.V27Budget&&typeof window.V27Budget.monthMap==="function")map=window.V27Budget.monthMap(selectedMonth);
+    const current=map[sel.value];
+    amount.value=current!==undefined?formatBRLInput(current):"";
+    back.classList.add("open");
+    setTimeout(()=>{amount.focus();amount.select()},0);
   }
+  window.openBudgetEditorDirect=open;
   document.addEventListener("click",function(e){
     const cat=e.target.closest(".budget-cat-link");
     if(cat){e.preventDefault();e.stopImmediatePropagation();open(cat.dataset.cat);return}
