@@ -5206,35 +5206,170 @@ header{background:#071A2D!important}
 
 
 
-<script id="budget-open-hotfix">
+
+<script id="budget-controller-v35">
+/*
+  V3.5 — controlador único de orçamento.
+  Resolve a convivência de implementações antigas sem alterar lançamentos,
+  autenticação ou a estrutura de dados já salva no Firebase.
+*/
 (function(){
-  function open(cat){
-    const back=document.getElementById("budgetBackdrop");
-    const sel=document.getElementById("bCategory");
-    const amount=document.getElementById("bAmount");
-    if(!back||!sel||!amount)return;
-    const cats=(window.V271&&typeof window.V271.allCategories==="function")
-      ? window.V271.allCategories()
-      : (Array.isArray(window.categories)?window.categories:[]);
-    sel.innerHTML=cats.map(c=>'<option>'+esc(c)+'</option>').join("");
-    if(cat&&cats.includes(cat))sel.value=cat;
-    let map=state.budgets||{};
-    if(window.V27Budget&&typeof window.V27Budget.monthMap==="function")map=window.V27Budget.monthMap(selectedMonth);
-    const current=map[sel.value];
-    amount.value=current!==undefined?formatBRLInput(current):"";
-    back.classList.add("open");
-    setTimeout(()=>{amount.focus();amount.select()},0);
+  const money=value=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(value)||0);
+  const selectedMonth=()=>document.getElementById("monthSelect")?.value||"";
+  const monthLabel=ym=>{
+    const [year,month]=String(ym||"").split("-").map(Number);
+    return year&&month?new Intl.DateTimeFormat("pt-BR",{month:"long",year:"numeric"}).format(new Date(year,month-1,1)):"mês selecionado";
+  };
+  const daysInMonth=ym=>{const [year,month]=String(ym||"").split("-").map(Number);return year&&month?new Date(year,month,0).getDate():30};
+  const isNumber=value=>Number.isFinite(Number(value));
+
+  function budgetApi(){
+    return window.V27Budget&&typeof window.V27Budget.monthMap==="function"&&typeof window.V27Budget.spent==="function"
+      ? window.V27Budget
+      : null;
   }
-  window.openBudgetEditorDirect=open;
-  document.addEventListener("click",function(e){
-    const cat=e.target.closest(".budget-cat-link");
-    if(cat){e.preventDefault();e.stopImmediatePropagation();open(cat.dataset.cat);return}
-    const btn=e.target.closest("#budget .section-title .btn-primary");
-    if(btn){e.preventDefault();e.stopImmediatePropagation();open();}
-  },true);
-  document.addEventListener("keydown",function(e){
-    const cat=e.target.closest?.(".budget-cat-link");
-    if(cat&&(e.key==="Enter"||e.key===" ")){e.preventDefault();e.stopImmediatePropagation();open(cat.dataset.cat)}
-  },true);
+
+  /*
+    O total sempre vem do mapa real do mês selecionado. Assim, categorias já
+    cadastradas em versões anteriores também entram no Orçamento inteligente.
+  */
+  function summaryData(){
+    const api=budgetApi(),ym=selectedMonth();
+    if(!api||!ym)return null;
+    const limits=api.monthMap(ym)||{},spent=api.spent(ym)||{};
+    const planned=Object.values(limits).reduce((total,value)=>total+(isNumber(value)?Number(value):0),0);
+    const used=Object.values(spent).reduce((total,value)=>total+(isNumber(value)?Number(value):0),0);
+    const categories=[...new Set([...Object.keys(limits),...Object.keys(spent)])];
+    return {ym,limits,spent,planned,used,categories};
+  }
+
+  function renderSmartBudget(){
+    const data=summaryData();
+    const host=document.getElementById("budget");
+    if(!data||!host)return;
+    let panel=document.getElementById("v17Smart");
+    if(!panel){
+      panel=document.createElement("div");
+      panel.id="v17Smart";
+      panel.className="card section";
+      host.prepend(panel);
+    }
+
+    const today=new Date();
+    const currentMonth=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0");
+    const progress=data.ym===currentMonth?Math.max(.05,today.getDate()/daysInMonth(data.ym)):1;
+    const projection=data.used/progress;
+    const available=data.planned-data.used;
+    const alerts=data.categories
+      .map(category=>{
+        const limit=Number(data.limits[category]||0),used=Number(data.spent[category]||0);
+        return {category,limit,used,pct:limit?used/limit*100:0,left:limit-used};
+      })
+      .filter(item=>item.limit>0&&item.pct>=70)
+      .sort((a,b)=>b.pct-a.pct);
+
+    const signature=JSON.stringify([data.ym,data.planned,data.used,data.categories.map(c=>[c,data.limits[c],data.spent[c]])]);
+    if(panel.dataset.budgetSignature===signature&&panel.querySelector('[data-budget-canonical="1"]'))return;
+    panel.dataset.budgetSignature=signature;
+    panel.innerHTML=
+      '<div class="section-title" data-budget-canonical="1"><h3>Orçamento inteligente</h3><span>'+monthLabel(data.ym)+'</span></div>'+
+      '<div class="v17-grid">'+
+        '<div class="v17-card"><span class="v17-k">Orçado</span><b class="privacy-value">'+money(data.planned)+'</b></div>'+
+        '<div class="v17-card"><span class="v17-k">Disponível</span><b class="privacy-value '+(available<0?"negative":"positive")+'">'+money(available)+'</b></div>'+
+        '<div class="v17-card"><span class="v17-k">Projeção do mês</span><b class="privacy-value">'+money(projection)+'</b></div>'+
+      '</div>'+
+      (alerts.length
+        ?alerts.map(item=>'<div class="v17-alert '+(item.pct>=100?"v17-danger":item.pct>=90?"v17-warn":"")+'"><strong>'+String(item.category).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]))+'</strong>: '+Math.round(item.pct)+'% consumido · restam <span class="privacy-value">'+money(item.left)+'</span></div>').join("")
+        :'<div class="v17-alert">Nenhuma categoria atingiu 70% do orçamento.</div>');
+
+    if(typeof window.applyPrivacyState==="function")window.applyPrivacyState();
+  }
+
+  function openEditor(category){
+    if(typeof window.openBudgetModal!=="function")return;
+    window.openBudgetModal(category||undefined);
+  }
+
+  /*
+    Mantém somente uma rota de gravação: submit do formulário → rotina já
+    conectada ao Firebase. O botão deixa de disparar handlers inline antigos.
+  */
+  function installSaveRoute(){
+    const form=document.getElementById("budgetForm");
+    const button=document.getElementById("budgetSaveBtn");
+    if(!form||form.dataset.v35Controller==="1")return false;
+
+    form.dataset.v35Controller="1";
+    if(button){
+      button.removeAttribute("onclick");
+      button.type="submit";
+      button.disabled=false;
+    }
+    form.addEventListener("submit",async event=>{
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if(form.dataset.v35Saving==="1")return;
+      if(typeof window.saveBudgetDirect!=="function")return;
+      form.dataset.v35Saving="1";
+      if(button){button.disabled=true;button.textContent="Salvando…";}
+      try{
+        await window.saveBudgetDirect();
+        renderSmartBudget();
+      }finally{
+        form.dataset.v35Saving="0";
+        if(button){button.disabled=false;button.textContent="Salvar";}
+      }
+    },true);
+    return true;
+  }
+
+  function installInteractionRoute(){
+    if(document.documentElement.dataset.v35BudgetClicks==="1")return;
+    document.documentElement.dataset.v35BudgetClicks="1";
+    document.addEventListener("click",event=>{
+      const category=event.target.closest(".budget-cat-link");
+      if(category){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openEditor(category.dataset.cat);
+        return;
+      }
+      const defineButton=event.target.closest("#budget .section-title .btn-primary");
+      if(defineButton){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openEditor();
+      }
+    },true);
+    document.addEventListener("keydown",event=>{
+      if(event.key!=="Enter"&&event.key!==" ")return;
+      const category=event.target.closest?.(".budget-cat-link");
+      if(!category)return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openEditor(category.dataset.cat);
+    },true);
+    document.getElementById("monthSelect")?.addEventListener("change",()=>setTimeout(renderSmartBudget,100));
+    document.addEventListener("click",event=>{
+      if(event.target.closest(".month-chip,.tab[data-view='budget'],.side-nav[data-view='budget']"))setTimeout(renderSmartBudget,120);
+    });
+  }
+
+  function boot(attempt=0){
+    installInteractionRoute();
+    const ready=!!budgetApi()&&typeof window.saveBudgetDirect==="function";
+    if(!ready&&attempt<80){setTimeout(()=>boot(attempt+1),50);return;}
+    installSaveRoute();
+    renderSmartBudget();
+  }
+
+  boot();
+
+  const budgetView=document.getElementById("budget");
+  if(budgetView){
+    const observer=new MutationObserver(()=>setTimeout(renderSmartBudget,0));
+    observer.observe(budgetView,{childList:true,subtree:true});
+  }
 })();
 </script>
+
