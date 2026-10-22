@@ -1797,7 +1797,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
       </div>
       <div class="form-actions">
         <button type="button" class="btn" onclick="closeBudgetModal()">Cancelar</button>
-        <button type="submit" id="budgetSaveBtn" class="btn btn-primary">Salvar</button>
+        <button type="button" id="budgetSaveBtn" class="btn btn-primary" onclick="if(window.V27Budget){window.V27Budget.saveBudget(event)}else{window.saveBudgetDirect()}">Salvar</button>
       </div>
     </form>
   </div>
@@ -4552,6 +4552,7 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
             updatedAt:firebase.firestore.FieldValue.serverTimestamp()
           },{merge:true});
         }
+        if(window.V17&&typeof window.V17.smart==="function")window.V17.smart();
         toast("Orçamento de "+monthName(selectedMonth)+" atualizado!");
       }catch(err){
         console.error("V27Budget.saveBudget",err);
@@ -4570,7 +4571,7 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
       if(oldForm){
         const cleanForm=oldForm.cloneNode(true);
         oldForm.replaceWith(cleanForm);
-        cleanForm.addEventListener("submit",e=>this.saveBudget(e));
+        cleanForm.addEventListener("submit",e=>{e.preventDefault();this.saveBudget(e)});
         document.getElementById("bAmount")?.addEventListener("input",e=>applyBRLMask(e.target));
         document.getElementById("bCategory")?.addEventListener("change",e=>{const sel=e.currentTarget,prev=this.monthOffset(selectedMonth,-1),last=Number(this.spent(prev)[sel.value]||0);{const current=this.monthMap(selectedMonth)[sel.value];document.getElementById("bAmount").value=current!==undefined?formatBRLInput(current):"";document.getElementById("bAmount").oninput=function(){applyBRLMask(this)};}const ref=document.getElementById("v27BudgetReference");if(ref)ref.innerHTML='<strong>Referência:</strong> gasto em '+esc(monthName(prev))+' = <span class="privacy-value">'+money(last)+'</span>';});
       }
