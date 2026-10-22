@@ -5273,9 +5273,11 @@ header{background:#071A2D!important}
 
   function install(){
     const api=core(),form=document.getElementById("budgetForm"),button=document.getElementById("budgetSaveBtn");
-    if(!api||!form||form.dataset.v35Controller==="1")return false;
+    if(!api||!form)return false;
+    /* Sempre restaura a abertura para o núcleo, mesmo após uma recriação legada do formulário. */
     window.openBudgetModal=category=>api.open(category);
     window.closeBudgetModal=()=>api.close();
+    if(form.dataset.v35Controller==="1")return true;
     form.dataset.v35Controller="1";
     if(button){button.removeAttribute("onclick");button.type="submit";button.disabled=false;}
     form.addEventListener("submit",async event=>{
