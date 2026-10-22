@@ -2551,7 +2551,7 @@ Regras:
     const cats=cfoSpentByCategory(selected);
     const alerts=[];
     Object.entries(cats).sort((a,b)=>b[1]-a[1]).forEach(([cat,val])=>{
-      const budget=Number(state.budgets[cat]||0);
+      const budget=Number(budgetMapForMonth(selectedMonth)[cat]||0);
       if(budget && val>budget){
         alerts.push({icon:"🔴",title:`${cat} acima do orçamento`,text:`${money(val-budget)} acima do limite de ${money(budget)}.`});
       }
@@ -2641,7 +2641,7 @@ Regras:
       return;
     }
     $("categoryList").innerHTML = list.map(([cat,val]) => {
-      const budget = Number(state.budgets[cat]||0);
+      const budget = Number(budgetMapForMonth(selectedMonth)[cat]||0);
       const maxScale = Math.max(val, budget, 1);
       const spentPct = Math.min((val/maxScale)*100, 100);
       const budgetPct = budget ? Math.min((budget/maxScale)*100, 100) : null;
@@ -2765,18 +2765,16 @@ Regras:
   }
 
   function renderBudget(){
-    const spent = {};
-    transactionsForMonth(selectedMonth).filter(t=>t.type==="expense").forEach(t => spent[t.category]=(spent[t.category]||0)+t.amount);
-    const rows = categories.map(cat => {
-      const limit = Number(state.budgets[cat]||0), used = Number(spent[cat]||0);
-      const pct = limit ? Math.min((used/limit)*100,100) : 0;
-      const over = limit && used>limit;
-      return `<div class="progress-row">
-        <div class="progress-head"><span><strong class="budget-cat-link" role="button" tabindex="0" data-cat="${esc(cat)}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${esc(cat)}</strong></span><span>${money(used)}${limit?' / '+money(limit):' · sem limite'}</span></div>
-        <div class="bar"><div class="${over?'over':''}" style="width:${pct}%"></div></div>
-      </div>`;
+    const spent={};
+    transactionsForMonth(selectedMonth).filter(t=>t.type==="expense").forEach(t=>spent[t.category]=(spent[t.category]||0)+Number(t.amount||0));
+    const budget=budgetMapForMonth(selectedMonth);
+    const allCategories=[...new Set([...categories,...Object.keys(budget),...Object.keys(spent)])];
+    const rows=allCategories.map(cat=>{
+      const limit=Number(budget[cat]||0),used=Number(spent[cat]||0);
+      const pct=limit?Math.min((used/limit)*100,100):0,over=limit&&used>limit;
+      return `<div class="progress-row"><div class="progress-head"><span><strong class="budget-cat-link" role="button" tabindex="0" data-cat="${esc(cat)}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${esc(cat)}</strong></span><span>${money(used)}${limit?" / "+money(limit):" · sem limite"}</span></div><div class="bar"><div class="${over?"over":""}" style="width:${pct}%"></div></div></div>`;
     });
-    $("budgetList").innerHTML = rows.length ? rows.join("") : `<div class="empty"><strong>Seu orçamento ainda não foi definido</strong>Crie limites por categoria para controlar seus gastos.</div>`;
+    $("budgetList").innerHTML=rows.join("");
   }
 
   $("budgetList").addEventListener("click",e=>{
@@ -3105,19 +3103,23 @@ Regras:
   function closeModal(){$("modalBackdrop").classList.remove("open"); editingTransactionId=null; $("ocrBox").style.display="";}
   function editTransaction(id){ openModal(id); }
   window.editTransaction = editTransaction;
+  function budgetMapForMonth(month=selectedMonth,create=false){
+    state.budgets=state.budgets||{};
+    const current=state.budgets[month];
+    if(current&&typeof current==="object"&&!Array.isArray(current))return current;
+    const legacy={};
+    Object.entries(state.budgets).forEach(([key,value])=>{
+      if(!/^\d{4}-\d{2}$/.test(key)&&typeof value==="number"&&Number.isFinite(value))legacy[key]=value;
+    });
+    if(create){state.budgets[month]={...legacy};return state.budgets[month];}
+    return legacy;
+  }
+
   async function saveBudgetDirect(){
     const cat=$("bCategory")?.value||"";
     const val=parseBRLCents($("bAmount")?.value||"");
     if(!cat||!Number.isFinite(val)||val<0){toast("Informe um limite mensal válido.");return}
-    state.budgets=state.budgets||{};
-    if(!state.budgets[selectedMonth]||typeof state.budgets[selectedMonth]!=="object"||Array.isArray(state.budgets[selectedMonth])){
-      const legacy={};
-      Object.entries(state.budgets).forEach(([k,v])=>{
-        if(!/^\d{4}-\d{2}$/.test(k)&&typeof v==="number"&&Number.isFinite(v))legacy[k]=v;
-      });
-      state.budgets[selectedMonth]=legacy;
-    }
-    state.budgets[selectedMonth][cat]=val;
+    budgetMapForMonth(selectedMonth,true)[cat]=val;
     localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
     try{
       if(currentUser&&cloudReady){
@@ -3126,22 +3128,24 @@ Regras:
           updatedAt:firebase.firestore.FieldValue.serverTimestamp()
         },{merge:true});
       }
-      if(window.V27Budget&&typeof window.V27Budget.render==="function")window.V27Budget.render();else renderBudget();
+      render();
       closeBudgetModal();
       toast("Orçamento atualizado: "+money(val));
     }catch(err){
       console.error("saveBudgetDirect",err);
-      toast("Salvo neste dispositivo, mas houve erro ao sincronizar.");
-      if(window.V27Budget&&typeof window.V27Budget.render==="function")window.V27Budget.render();else renderBudget();
+      render();
       closeBudgetModal();
+      toast("Salvo neste dispositivo, mas houve erro ao sincronizar.");
     }
   }
   window.saveBudgetDirect=saveBudgetDirect;
 
   function openBudgetModal(cat){
-    $("bCategory").innerHTML=categories.map(c=>`<option>${esc(c)}</option>`).join("");
-    if(cat && categories.includes(cat)) $("bCategory").value=cat;
-    {const map=window.V27Budget?window.V27Budget.monthMap(selectedMonth):state.budgets;const current=map[$("bCategory").value];$("bAmount").value=current!==undefined?formatBRLInput(current):"";}
+    const allCategories=[...new Set([...categories,...Object.keys(budgetMapForMonth(selectedMonth))])];
+    $("bCategory").innerHTML=allCategories.map(c=>`<option>${esc(c)}</option>`).join("");
+    if(cat&&allCategories.includes(cat)) $("bCategory").value=cat;
+    const current=budgetMapForMonth(selectedMonth)[$("bCategory").value];
+    $("bAmount").value=current!==undefined?formatBRLInput(current):"";
     $("budgetBackdrop").classList.add("open");
     $("bAmount").focus();
     $("bAmount").select();
@@ -3170,6 +3174,23 @@ Regras:
 
   window.openModal=openModal; window.closeModal=closeModal;
   window.openBudgetModal=openBudgetModal; window.closeBudgetModal=closeBudgetModal;
+  window.__financeBudgetCore={
+    selectedMonth:()=>selectedMonth,
+    monthMap:(month=selectedMonth,create=false)=>budgetMapForMonth(month,create),
+    spent:(month=selectedMonth)=>{
+      const result={};
+      transactionsForMonth(month).filter(t=>t.type==="expense").forEach(t=>{
+        const category=t.category||"Outros";
+        result[category]=(result[category]||0)+Number(t.amount||0);
+      });
+      return result;
+    },
+    categories:()=>[...new Set([...categories,...Object.keys(budgetMapForMonth(selectedMonth)),...state.transactions.map(t=>t.category).filter(Boolean)])],
+    open:(category)=>openBudgetModal(category),
+    close:()=>closeBudgetModal(),
+    save:()=>saveBudgetDirect(),
+    render:()=>render()
+  };
   window.openGoalModal=openGoalModal; window.closeGoalModal=closeGoalModal;
   window.openWealthModal=openWealthModal; window.closeWealthModal=closeWealthModal;
 
@@ -5207,169 +5228,90 @@ header{background:#071A2D!important}
 
 
 
+
 <script id="budget-controller-v35">
-/*
-  V3.5 — controlador único de orçamento.
-  Resolve a convivência de implementações antigas sem alterar lançamentos,
-  autenticação ou a estrutura de dados já salva no Firebase.
-*/
+/* V3.5 — única camada externa: interface do orçamento ligada ao núcleo do app. */
 (function(){
   const money=value=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(value)||0);
-  const selectedMonth=()=>document.getElementById("monthSelect")?.value||"";
-  const monthLabel=ym=>{
+  const escapeHtml=value=>String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+  const core=()=>window.__financeBudgetCore||null;
+  const monthName=ym=>{
     const [year,month]=String(ym||"").split("-").map(Number);
     return year&&month?new Intl.DateTimeFormat("pt-BR",{month:"long",year:"numeric"}).format(new Date(year,month-1,1)):"mês selecionado";
   };
-  const daysInMonth=ym=>{const [year,month]=String(ym||"").split("-").map(Number);return year&&month?new Date(year,month,0).getDate():30};
-  const isNumber=value=>Number.isFinite(Number(value));
 
-  function budgetApi(){
-    return window.V27Budget&&typeof window.V27Budget.monthMap==="function"&&typeof window.V27Budget.spent==="function"
-      ? window.V27Budget
-      : null;
-  }
-
-  /*
-    O total sempre vem do mapa real do mês selecionado. Assim, categorias já
-    cadastradas em versões anteriores também entram no Orçamento inteligente.
-  */
   function summaryData(){
-    const api=budgetApi(),ym=selectedMonth();
-    if(!api||!ym)return null;
-    const limits=api.monthMap(ym)||{},spent=api.spent(ym)||{};
-    const planned=Object.values(limits).reduce((total,value)=>total+(isNumber(value)?Number(value):0),0);
-    const used=Object.values(spent).reduce((total,value)=>total+(isNumber(value)?Number(value):0),0);
-    const categories=[...new Set([...Object.keys(limits),...Object.keys(spent)])];
-    return {ym,limits,spent,planned,used,categories};
+    const api=core();
+    if(!api)return null;
+    const month=api.selectedMonth(),limits=api.monthMap(month)||{},spent=api.spent(month)||{};
+    const planned=Object.values(limits).reduce((sum,value)=>sum+(Number(value)||0),0);
+    const used=Object.values(spent).reduce((sum,value)=>sum+(Number(value)||0),0);
+    return {month,limits,spent,planned,used,categories:[...new Set([...api.categories(),...Object.keys(limits),...Object.keys(spent)])]};
   }
 
   function renderSmartBudget(){
-    const data=summaryData();
-    const host=document.getElementById("budget");
+    const data=summaryData(),host=document.getElementById("budget");
     if(!data||!host)return;
     let panel=document.getElementById("v17Smart");
-    if(!panel){
-      panel=document.createElement("div");
-      panel.id="v17Smart";
-      panel.className="card section";
-      host.prepend(panel);
-    }
-
-    const today=new Date();
-    const currentMonth=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0");
-    const progress=data.ym===currentMonth?Math.max(.05,today.getDate()/daysInMonth(data.ym)):1;
-    const projection=data.used/progress;
-    const available=data.planned-data.used;
-    const alerts=data.categories
-      .map(category=>{
-        const limit=Number(data.limits[category]||0),used=Number(data.spent[category]||0);
-        return {category,limit,used,pct:limit?used/limit*100:0,left:limit-used};
-      })
-      .filter(item=>item.limit>0&&item.pct>=70)
-      .sort((a,b)=>b.pct-a.pct);
-
-    const signature=JSON.stringify([data.ym,data.planned,data.used,data.categories.map(c=>[c,data.limits[c],data.spent[c]])]);
-    if(panel.dataset.budgetSignature===signature&&panel.querySelector('[data-budget-canonical="1"]'))return;
+    if(!panel){panel=document.createElement("div");panel.id="v17Smart";panel.className="card section";host.prepend(panel);}
+    const now=new Date(),currentMonth=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+    const days=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    const progress=data.month===currentMonth?Math.max(.05,now.getDate()/days):1;
+    const available=data.planned-data.used,projection=data.used/progress;
+    const alerts=data.categories.map(category=>{
+      const limit=Number(data.limits[category]||0),used=Number(data.spent[category]||0);
+      return {category,limit,used,pct:limit?used/limit*100:0,left:limit-used};
+    }).filter(item=>item.limit>0&&item.pct>=70).sort((a,b)=>b.pct-a.pct);
+    const signature=JSON.stringify([data.month,data.planned,data.used,data.categories.map(c=>[c,data.limits[c],data.spent[c]])]);
+    if(panel.dataset.budgetSignature===signature&&panel.querySelector("[data-budget-canonical='1']"))return;
     panel.dataset.budgetSignature=signature;
-    panel.innerHTML=
-      '<div class="section-title" data-budget-canonical="1"><h3>Orçamento inteligente</h3><span>'+monthLabel(data.ym)+'</span></div>'+
-      '<div class="v17-grid">'+
-        '<div class="v17-card"><span class="v17-k">Orçado</span><b class="privacy-value">'+money(data.planned)+'</b></div>'+
-        '<div class="v17-card"><span class="v17-k">Disponível</span><b class="privacy-value '+(available<0?"negative":"positive")+'">'+money(available)+'</b></div>'+
-        '<div class="v17-card"><span class="v17-k">Projeção do mês</span><b class="privacy-value">'+money(projection)+'</b></div>'+
-      '</div>'+
-      (alerts.length
-        ?alerts.map(item=>'<div class="v17-alert '+(item.pct>=100?"v17-danger":item.pct>=90?"v17-warn":"")+'"><strong>'+String(item.category).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]))+'</strong>: '+Math.round(item.pct)+'% consumido · restam <span class="privacy-value">'+money(item.left)+'</span></div>').join("")
-        :'<div class="v17-alert">Nenhuma categoria atingiu 70% do orçamento.</div>');
-
-    if(typeof window.applyPrivacyState==="function")window.applyPrivacyState();
+    panel.innerHTML='<div class="section-title" data-budget-canonical="1"><h3>Orçamento inteligente</h3><span>'+monthName(data.month)+'</span></div>'+
+      '<div class="v17-grid"><div class="v17-card"><span class="v17-k">Orçado</span><b class="privacy-value">'+money(data.planned)+'</b></div><div class="v17-card"><span class="v17-k">Disponível</span><b class="privacy-value '+(available<0?"negative":"positive")+'">'+money(available)+'</b></div><div class="v17-card"><span class="v17-k">Projeção do mês</span><b class="privacy-value">'+money(projection)+'</b></div></div>'+
+      (alerts.length?alerts.map(item=>'<div class="v17-alert '+(item.pct>=100?"v17-danger":item.pct>=90?"v17-warn":"")+'"><strong>'+escapeHtml(item.category)+'</strong>: '+Math.round(item.pct)+'% consumido · restam <span class="privacy-value">'+money(item.left)+'</span></div>').join(""):'<div class="v17-alert">Nenhuma categoria atingiu 70% do orçamento.</div>');
+    window.applyPrivacyState?.();
   }
 
-  function openEditor(category){
-    if(typeof window.openBudgetModal!=="function")return;
-    window.openBudgetModal(category||undefined);
-  }
-
-  /*
-    Mantém somente uma rota de gravação: submit do formulário → rotina já
-    conectada ao Firebase. O botão deixa de disparar handlers inline antigos.
-  */
-  function installSaveRoute(){
-    const form=document.getElementById("budgetForm");
-    const button=document.getElementById("budgetSaveBtn");
-    if(!form||form.dataset.v35Controller==="1")return false;
-
+  function install(){
+    const api=core(),form=document.getElementById("budgetForm"),button=document.getElementById("budgetSaveBtn");
+    if(!api||!form||form.dataset.v35Controller==="1")return false;
+    window.openBudgetModal=category=>api.open(category);
+    window.closeBudgetModal=()=>api.close();
     form.dataset.v35Controller="1";
-    if(button){
-      button.removeAttribute("onclick");
-      button.type="submit";
-      button.disabled=false;
-    }
+    if(button){button.removeAttribute("onclick");button.type="submit";button.disabled=false;}
     form.addEventListener("submit",async event=>{
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      event.preventDefault();event.stopImmediatePropagation();
       if(form.dataset.v35Saving==="1")return;
-      if(typeof window.saveBudgetDirect!=="function")return;
       form.dataset.v35Saving="1";
       if(button){button.disabled=true;button.textContent="Salvando…";}
-      try{
-        await window.saveBudgetDirect();
-        renderSmartBudget();
-      }finally{
-        form.dataset.v35Saving="0";
-        if(button){button.disabled=false;button.textContent="Salvar";}
-      }
+      try{await api.save();renderSmartBudget();}finally{form.dataset.v35Saving="0";if(button){button.disabled=false;button.textContent="Salvar";}}
     },true);
     return true;
   }
 
-  function installInteractionRoute(){
-    if(document.documentElement.dataset.v35BudgetClicks==="1")return;
+  if(!document.documentElement.dataset.v35BudgetClicks){
     document.documentElement.dataset.v35BudgetClicks="1";
     document.addEventListener("click",event=>{
       const category=event.target.closest(".budget-cat-link");
-      if(category){
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        openEditor(category.dataset.cat);
-        return;
-      }
+      if(category){event.preventDefault();event.stopImmediatePropagation();core()?.open(category.dataset.cat);return;}
       const defineButton=event.target.closest("#budget .section-title .btn-primary");
-      if(defineButton){
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        openEditor();
-      }
+      if(defineButton){event.preventDefault();event.stopImmediatePropagation();core()?.open();}
     },true);
     document.addEventListener("keydown",event=>{
       if(event.key!=="Enter"&&event.key!==" ")return;
       const category=event.target.closest?.(".budget-cat-link");
-      if(!category)return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      openEditor(category.dataset.cat);
+      if(category){event.preventDefault();event.stopImmediatePropagation();core()?.open(category.dataset.cat);}
     },true);
-    document.getElementById("monthSelect")?.addEventListener("change",()=>setTimeout(renderSmartBudget,100));
-    document.addEventListener("click",event=>{
-      if(event.target.closest(".month-chip,.tab[data-view='budget'],.side-nav[data-view='budget']"))setTimeout(renderSmartBudget,120);
-    });
+    document.getElementById("monthSelect")?.addEventListener("change",()=>setTimeout(renderSmartBudget,80));
+    document.addEventListener("click",event=>{if(event.target.closest(".month-chip,.tab[data-view='budget'],.side-nav[data-view='budget']"))setTimeout(renderSmartBudget,100);});
   }
 
   function boot(attempt=0){
-    installInteractionRoute();
-    const ready=!!budgetApi()&&typeof window.saveBudgetDirect==="function";
-    if(!ready&&attempt<80){setTimeout(()=>boot(attempt+1),50);return;}
-    installSaveRoute();
+    if(!install()&&attempt<80){setTimeout(()=>boot(attempt+1),50);return;}
     renderSmartBudget();
   }
-
   boot();
-
-  const budgetView=document.getElementById("budget");
-  if(budgetView){
-    const observer=new MutationObserver(()=>setTimeout(renderSmartBudget,0));
-    observer.observe(budgetView,{childList:true,subtree:true});
-  }
+  const view=document.getElementById("budget");
+  if(view)new MutationObserver(()=>setTimeout(renderSmartBudget,0)).observe(view,{childList:true,subtree:true});
 })();
 </script>
 
