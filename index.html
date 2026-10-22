@@ -2185,6 +2185,7 @@ Regras:
   }));
 
   let signupMode=false;
+  let signupInProgress=false;
   function setSignupMode(enabled){
     signupMode=enabled;
     $("signupFields").style.display=enabled ? "block" : "none";
@@ -2218,6 +2219,7 @@ Regras:
     loadingCloud=false;
     state=emptyState();
     render();
+    signupInProgress=true;
     try{
       const credential=await firebaseAuth.createUserWithEmailAndPassword(email,password);
       const createdUser=credential.user;
@@ -2254,7 +2256,18 @@ Regras:
       }
       $("authInvite").value="";
       setSignupMode(false);
-    }catch(err){ showAuthError(authError(err)); }
+      signupInProgress=false;
+      currentUser=createdUser;
+      $("authGate").classList.add("hidden");
+      $("authUser").textContent=createdUser.email || "";
+      $("logoutBtn").style.display="inline-flex";
+      $("drawerEmail").textContent=createdUser.email || "";
+      $("betaAdminBtn").style.display=isBetaAdmin() ? "inline-flex" : "none";
+      await loadCloudData();
+    }catch(err){
+      signupInProgress=false;
+      showAuthError(authError(err));
+    }
   });
 
   $("signupCancelBtn").addEventListener("click",()=>setSignupMode(false));
@@ -2360,6 +2373,9 @@ Regras:
   firebaseAuth.onAuthStateChanged(async(user)=>{
     currentUser=user;
     if(user){
+      // createUser autentica antes de convite + perfil terminarem.
+      // Não abra o app até o cadastro estar integralmente concluído.
+      if(signupInProgress) return;
       $("authGate").classList.add("hidden");
       $("authUser").textContent=user.email || "";
       $("logoutBtn").style.display="inline-flex";
