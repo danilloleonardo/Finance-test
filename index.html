@@ -1272,6 +1272,37 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
   #toast,.toast{bottom:calc(86px + env(safe-area-inset-bottom, 0px))}
 }
 </style>
+
+<style id="mobile-toolbar-and-floating-controls-fix">
+@media(max-width:760px){
+  /* Compacta as ações de exportação para não empurrar o conteúdo para baixo. */
+  main .toolbar{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin-bottom:14px}
+  main .toolbar>div:first-child{min-width:0}
+  main .toolbar .actions{
+    display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;
+    align-items:center;gap:7px;width:100%;max-width:100%;min-width:0;
+    overflow-x:auto;overflow-y:hidden;padding:2px 2px 8px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none
+  }
+  main .toolbar .actions::-webkit-scrollbar{display:none}
+  main .toolbar .actions .btn{
+    flex:0 0 auto!important;width:auto!important;min-height:36px;
+    padding:8px 11px;font-size:11px;white-space:nowrap;box-shadow:none
+  }
+  main .toolbar .actions .btn-primary{order:-1}
+  /* Mantém o Beta e a IA visíveis acima da barra inferior, sem sobreposição. */
+  #betaAdminBtn{right:88px!important;bottom:calc(88px + env(safe-area-inset-bottom, 0px))!important;z-index:121!important}
+  #v32AiFab{right:16px!important;bottom:calc(88px + env(safe-area-inset-bottom, 0px))!important;z-index:122!important;width:52px!important;height:52px!important;min-width:52px!important}
+  #v32AiPanel{right:10px!important;bottom:calc(148px + env(safe-area-inset-bottom, 0px))!important;width:calc(100vw - 20px)!important;max-height:calc(100dvh - 180px)!important}
+  #firebaseStatus{bottom:calc(86px + env(safe-area-inset-bottom, 0px))!important}
+}
+@media(max-width:390px){
+  main .toolbar .actions .btn{padding:7px 9px;font-size:10px}
+  #betaAdminBtn{right:76px!important;padding:8px 10px!important;font-size:11px!important}
+  #v32AiFab{right:14px!important;width:48px!important;height:48px!important;min-width:48px!important}
+}
+</style>
+
 </head>
 
 <body>
