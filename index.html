@@ -3159,7 +3159,7 @@ Regras:
     const val=parseBRLCents($("bAmount")?.value||"");
     if(!cat||!Number.isFinite(val)||val<0){toast("Informe um limite mensal válido.");return}
     budgetMapForMonth(selectedMonth,true)[cat]=val;
-    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+    localStorage.setItem(currentUser ? userStorageKey(currentUser.uid) : STORAGE_KEY,JSON.stringify(state));
     try{
       if(currentUser&&cloudReady){
         await userRef().collection("settings").doc("main").set({
