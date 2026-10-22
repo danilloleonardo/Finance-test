@@ -5148,7 +5148,90 @@ body.v2022-ai-open #v32AiFab{z-index:1200}
   }
 }
 </style>
-\n</body>
+\n
+<script id="v34-budget-canonical-fix">
+(function(){
+  /* V3.4 — camada canônica de Orçamento. Mantém UI/dados existentes e neutraliza conflitos legados. */
+  function B(){return window.V27Budget}
+  function cats(){
+    if(window.V271&&typeof V271.allCategories==="function")return V271.allCategories();
+    return Array.isArray(window.categories)?categories:[];
+  }
+  function map(){return B()?B().monthMap(selectedMonth):{}}
+  function refreshSummary(){
+    const host=document.getElementById("v31BudgetSummary"),v=B();if(!host||!v)return;
+    const limits=map(),used=v.spent(selectedMonth)||{};
+    const planned=Object.values(limits).reduce((a,x)=>a+(Number(x)||0),0);
+    const spent=Object.values(used).reduce((a,x)=>a+(Number(x)||0),0);
+    const left=planned-spent,pct=planned?spent/planned*100:0;
+    host.innerHTML='<div class="v31-budget-kpi"><small>Orçamento do mês</small><strong class="privacy-value">'+money(planned)+'</strong></div>'+
+      '<div class="v31-budget-kpi"><small>Já utilizado</small><strong class="privacy-value">'+money(spent)+'</strong></div>'+
+      '<div class="v31-budget-kpi"><small>'+(left>=0?'Ainda disponível':'Acima do orçamento')+'</small><strong class="privacy-value '+(left<0?'negative':'positive')+'">'+money(Math.abs(left))+'</strong></div>'+
+      '<div class="v31-budget-status" style="grid-column:1/-1"><strong>'+Math.round(pct)+'% utilizado</strong> · '+(planned?(pct>100?'Seu orçamento mensal foi ultrapassado.':pct>=80?'Atenção: você está próximo do limite do mês.':'Você ainda está dentro do planejamento.'):'Defina limites por categoria para acompanhar o mês.')+'</div>';
+    if(typeof applyPrivacyState==="function")applyPrivacyState();
+  }
+  function open(cat){
+    const v=B(),sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount"),back=document.getElementById("budgetBackdrop");
+    if(!v||!sel||!amount||!back)return;
+    const all=cats();sel.innerHTML=all.map(c=>'<option>'+esc(c)+'</option>').join("");
+    if(cat&&all.includes(cat))sel.value=cat;
+    const current=map()[sel.value];
+    amount.value=current!==undefined?formatBRLInput(current):"";
+    back.classList.add("open");
+    setTimeout(()=>{amount.focus();amount.select()},0);
+  }
+  async function saveBudget(){
+    const v=B(),sel=document.getElementById("bCategory"),amount=document.getElementById("bAmount");
+    if(!v||!sel||!amount)return;
+    const cat=sel.value,val=parseBRLCents(amount.value);
+    if(!cat||!Number.isFinite(val)||val<0){toast("Informe um limite mensal válido.");return}
+    v.setMonthValue(selectedMonth,cat,val);
+    if(currentUser)localStorage.setItem(userStorageKey(currentUser.uid),JSON.stringify(state));
+    v.render();refreshSummary();closeBudgetModal();
+    try{
+      if(currentUser&&cloudReady){
+        await userRef().collection("settings").doc("main").set({
+          budgets:state.budgets,
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        },{merge:true});
+      }
+      toast("Orçamento de "+monthName(selectedMonth)+" atualizado!");
+    }catch(err){
+      console.error("V34Budget.save",err);
+      toast("Orçamento atualizado neste dispositivo, mas houve erro ao sincronizar.");
+    }
+  }
+  function install(){
+    if(!B())return setTimeout(install,80);
+    window.openBudgetModal=open;
+    window.V34Budget={open,save:saveBudget,summary:refreshSummary};
+    const btn=document.getElementById("budgetSaveBtn");
+    if(btn){btn.type="button";btn.onclick=saveBudget}
+    const amount=document.getElementById("bAmount");
+    if(amount){
+      const clean=amount.cloneNode(true);amount.replaceWith(clean);
+      clean.addEventListener("input",()=>applyBRLMask(clean));
+    }
+    const sel=document.getElementById("bCategory");
+    if(sel)sel.onchange=()=>{const a=document.getElementById("bAmount"),v=map()[sel.value];a.value=v!==undefined?formatBRLInput(v):""};
+    document.addEventListener("click",e=>{
+      const link=e.target.closest("#budgetList .budget-cat-link");
+      if(link){e.preventDefault();e.stopImmediatePropagation();open(link.dataset.cat);return}
+      if(e.target.closest("#budget .section-title .btn-primary")){e.preventDefault();e.stopImmediatePropagation();open()}
+    },true);
+    document.addEventListener("keydown",e=>{
+      const link=e.target.closest?.("#budgetList .budget-cat-link");
+      if(link&&(e.key==="Enter"||e.key===" ")){e.preventDefault();e.stopImmediatePropagation();open(link.dataset.cat)}
+    },true);
+    const oldRender=B().render.bind(B());
+    B().render=function(){oldRender();refreshSummary()};
+    B().render();
+    document.getElementById("monthSelect")?.addEventListener("change",()=>setTimeout(()=>B().render(),100));
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
+})();
+</script>
+</body>
 </html>
 
 <style id="v2012-card-privacy-fix">#tCardClosing,#tCardDue{filter:none!important;opacity:1!important;color:var(--text)!important;-webkit-text-security:none!important}#tCardFields{filter:none!important}#savedCardsList .cc-purchase-meta strong{color:var(--text)}</style>
