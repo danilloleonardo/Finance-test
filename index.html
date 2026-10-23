@@ -4471,13 +4471,30 @@ Retorne SOMENTE o JSON solicitado nas regras do sistema.
     btn.addEventListener("click",()=>{
       const target=document.querySelector(`.tab[data-view="${btn.dataset.view}"]`);
       if(target) target.click();
-      document.querySelectorAll(".side-nav[data-view]").forEach(x=>x.classList.remove("active"));
-      btn.classList.add("active");
+      document.querySelectorAll(".side-nav[data-view]").forEach(x=>x.classList.toggle("active",x.dataset.view===btn.dataset.view));
+    });
+  });
+  document.querySelectorAll(".mobile-nav-item[data-view]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const target=document.querySelector(`.tab[data-view="${btn.dataset.view}"]`);
+      if(target) target.click();
+      document.querySelectorAll(".mobile-nav-item[data-view]").forEach(x=>{
+        const active=x.dataset.view===btn.dataset.view;
+        x.classList.toggle("active",active);
+        if(active) x.setAttribute("aria-current","page");
+        else x.removeAttribute("aria-current");
+      });
     });
   });
   document.querySelectorAll(".tab").forEach(tab=>{
     tab.addEventListener("click",()=>{
       document.querySelectorAll(".side-nav[data-view]").forEach(x=>x.classList.toggle("active",x.dataset.view===tab.dataset.view));
+      document.querySelectorAll(".mobile-nav-item[data-view]").forEach(x=>{
+        const active=x.dataset.view===tab.dataset.view;
+        x.classList.toggle("active",active);
+        if(active) x.setAttribute("aria-current","page");
+        else x.removeAttribute("aria-current");
+      });
     });
   });
   $("sideThemeQuick")?.addEventListener("click",()=>$("themeBtn")?.click());
