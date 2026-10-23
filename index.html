@@ -5428,6 +5428,32 @@ header{background:#071A2D!important}
 
 
 
+
+<style id="v371-mobile-budget-modal-fix">
+/* V3.7.1 — no celular, a janela do orçamento fica acima da navegação inferior. */
+#budgetBackdrop{z-index:10010}
+#budgetBackdrop .modal{
+  position:relative;
+  max-height:calc(100vh - 36px);
+  max-height:calc(100dvh - 36px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+#budgetBackdrop .form-actions{
+  position:sticky;
+  bottom:-1px;
+  padding:10px 0 2px;
+  background:var(--card);
+  z-index:2;
+}
+#budgetBackdrop #budgetSaveBtn{touch-action:manipulation}
+@media(max-width:900px){
+  #budgetBackdrop{padding:12px;align-items:center}
+  #budgetBackdrop .modal{width:100%;max-width:560px}
+}
+</style>
+
 <script id="budget-controller-v35">
 /* V3.5 — única camada externa: interface do orçamento ligada ao núcleo do app. */
 (function(){
