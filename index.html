@@ -3507,9 +3507,9 @@ Regras:
     if(el && id==="periodPreset") el.addEventListener("change",()=>{ $("customRange").style.display=el.value==="custom"?"flex":"none"; renderTransactions(); });
   });
 
-  // Privacidade dos valores: por segurança, inicia sempre ocultos ao entrar no aplicativo.
+  // Preferência solicitada: iniciar com valores visíveis; o botão de olho continua permitindo ocultá-los.
   const privacyKey="financas-a-dois-hide-values";
-  let valuesHidden=true;
+  let valuesHidden=false;
 
   /*
     Alguns componentes são montados dinamicamente. Esta rotina identifica
