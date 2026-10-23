@@ -2166,6 +2166,20 @@ Regras:
           ? {...emptyState(), ...localState, cards:localState.cards || []}
           : emptyState();
 
+        // As configurações da nuvem são a fonte prioritária, mesmo quando ainda não existem lançamentos.
+        // Isso evita que um cache antigo sobrescreva limites de orçamento já salvos na conta.
+        const cloudSettings = settingsSnap.exists ? settingsSnap.data() : {};
+        if (Object.prototype.hasOwnProperty.call(cloudSettings, "budgets")
+            && cloudSettings.budgets && typeof cloudSettings.budgets === "object"
+            && !Array.isArray(cloudSettings.budgets)) {
+          state.budgets = cloudSettings.budgets;
+        } else {
+          state.budgets = state.budgets || {};
+        }
+        if (Object.prototype.hasOwnProperty.call(cloudSettings, "goals")) state.goals = Array.isArray(cloudSettings.goals) ? cloudSettings.goals : [];
+        if (Object.prototype.hasOwnProperty.call(cloudSettings, "wealth")) state.wealth = Array.isArray(cloudSettings.wealth) ? cloudSettings.wealth : [];
+        if (Object.prototype.hasOwnProperty.call(cloudSettings, "cards")) state.cards = Array.isArray(cloudSettings.cards) ? cloudSettings.cards : [];
+
         // Se esta própria conta já possui cache isolado, restaura somente os dados dela.
         if(state.transactions.length){
           const batch = firebaseDb.batch();
