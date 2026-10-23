@@ -1830,7 +1830,7 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
         </div>
         <div class="field">
           <label>Limite mensal</label>
-          <input id="bAmount" class="privacy-entry-visible" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00" oninput="applyBRLMask(this)" required>
+          <input id="bAmount" class="privacy-entry-visible" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00" required>
         </div>
       </div>
       <div class="form-actions">
@@ -5481,22 +5481,28 @@ header{background:#071A2D!important}
     const amount=document.getElementById("bAmount");
     if(amount&&!amount.dataset.centMask){
       amount.dataset.centMask="1";
+      amount.removeAttribute("oninput");
       amount.addEventListener("input",event=>{
-        const digits=String(event.currentTarget.value||"").replace(/\D/g,"");
-        event.currentTarget.value=digits?money(Number(digits)/100):"";
+        const field=event.currentTarget;
+        const digits=String(field.value||"").replace(/\D/g,"");
+        field.value=digits?money(Number(digits)/100):"";
       },true);
     }
 
     if(form.dataset.v35Controller==="1")return true;
     form.dataset.v35Controller="1";
-    if(button){button.removeAttribute("onclick");button.type="submit";button.disabled=false;}
-    form.addEventListener("submit",async event=>{
-      event.preventDefault();event.stopImmediatePropagation();
+    if(button){button.removeAttribute("onclick");button.type="button";button.disabled=false;}
+    const submitBudget=async event=>{
+      if(event){event.preventDefault();event.stopImmediatePropagation();}
       if(form.dataset.v35Saving==="1")return;
       form.dataset.v35Saving="1";
       if(button){button.disabled=true;button.textContent="Salvando…";}
-      try{await api.save();renderSmartBudget();}finally{form.dataset.v35Saving="0";if(button){button.disabled=false;button.textContent="Salvar";}}
-    },true);
+      try{await api.save();renderSmartBudget();}
+      catch(err){console.error("Falha ao salvar orçamento",err);toast("Não foi possível salvar o orçamento. Tente novamente.");}
+      finally{form.dataset.v35Saving="0";if(button){button.disabled=false;button.textContent="Salvar";}}
+    };
+    if(button)button.addEventListener("click",submitBudget);
+    form.addEventListener("submit",submitBudget,true);
     return true;
   }
 
