@@ -1352,6 +1352,16 @@ body.view-dashboard #cfoPanel.dash-collapsible>.dash-collapse-head{
     <button class="side-nav side-settings" id="sideThemeQuick" type="button"><span class="side-icon">☀</span><span>Alternar tema</span></button>
     <button class="side-nav side-settings" id="sideLogoutQuick" type="button"><span class="side-icon">↪</span><span>Sair</span></button>
   </aside>
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Navegação mobile">
+    <button type="button" class="mobile-nav-item active" data-view="dashboard" aria-current="page"><span class="mobile-nav-icon">⌂</span><span>Início</span></button>
+    <button type="button" class="mobile-nav-item" data-view="transactions"><span class="mobile-nav-icon">↕</span><span>Lançamentos</span></button>
+    <button type="button" class="mobile-nav-item" data-view="creditcard"><span class="mobile-nav-icon">▤</span><span>Fatura</span></button>
+    <button type="button" class="mobile-nav-item" data-view="cards"><span class="mobile-nav-icon">▣</span><span>Cartões</span></button>
+    <button type="button" class="mobile-nav-item" data-view="budget"><span class="mobile-nav-icon">◉</span><span>Orçamento</span></button>
+    <button type="button" class="mobile-nav-item" data-view="goals"><span class="mobile-nav-icon">◎</span><span>Metas</span></button>
+    <button type="button" class="mobile-nav-item" data-view="wealth"><span class="mobile-nav-icon">◆</span><span>Patrimônio</span></button>
+  </nav>
+
   <header>
     <div class="header-inner">
       <button type="button" class="brand" id="brandMenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="sideDrawer">
@@ -3800,9 +3810,20 @@ Regras:
       tab.classList.add("active");
       $(tab.dataset.view).classList.add("active");
       $("pageTitle").textContent = ({
-        dashboard:"Visão geral",transactions:"Lançamentos",creditcard:"Cartão de crédito",budget:"Orçamento",goals:"Metas",wealth:"Patrimônio"
+        dashboard:"Visão geral",transactions:"Lançamentos",creditcard:"Cartão de crédito",cards:"Meus cartões",budget:"Orçamento",goals:"Metas",wealth:"Patrimônio"
       })[tab.dataset.view];
       if(tab.dataset.view==="creditcard") renderCreditCard();
+      document.querySelectorAll(".mobile-nav-item[data-view]").forEach(item=>{
+        const active=item.dataset.view===tab.dataset.view;
+        item.classList.toggle("active",active);
+        if(active)item.setAttribute("aria-current","page");else item.removeAttribute("aria-current");
+      });
+    });
+  });
+  document.querySelectorAll(".mobile-nav-item[data-view]").forEach(item=>{
+    item.addEventListener("click",()=>{
+      const target=document.querySelector('.tab[data-view="'+item.dataset.view+'"]');
+      if(target)target.click();
     });
   });
 
@@ -5355,6 +5376,34 @@ header{background:#071A2D!important}
 .cfo-hero{background:linear-gradient(145deg,#102B46,#0B1E34)!important}
 .ai-assistant{background:linear-gradient(145deg,#103B61,#0D2945)!important}
 #firebaseStatus,.toast{background:#0A2036!important}
+
+/* V3.7 — navegação inferior mobile, sem remover a navegação desktop */
+.mobile-bottom-nav{display:none}
+@media(max-width:900px){
+  .mobile-bottom-nav{
+    position:fixed;z-index:9998;left:0;right:0;bottom:0;
+    display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:0;
+    padding:7px 3px calc(7px + env(safe-area-inset-bottom));
+    background:rgba(8,31,25,.97);border-top:1px solid rgba(255,255,255,.12);
+    box-shadow:0 -8px 28px rgba(0,0,0,.24);backdrop-filter:blur(18px);
+  }
+  .mobile-nav-item{
+    min-width:0;min-height:48px;padding:5px 1px 3px;border:0;border-radius:10px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    background:transparent;color:rgba(255,255,255,.66);font:600 9px/1.15 system-ui,-apple-system,sans-serif;
+    white-space:normal;overflow-wrap:anywhere;cursor:pointer;
+  }
+  .mobile-nav-icon{font-size:18px;line-height:1.05}
+  .mobile-nav-item.active{color:#fff;background:rgba(45,190,133,.18)}
+  .mobile-nav-item.active .mobile-nav-icon{color:#65e6ad}
+  .tabs{display:none!important}
+  .view{padding-bottom:calc(78px + env(safe-area-inset-bottom))}
+}
+@media(max-width:380px){
+  .mobile-nav-item{font-size:8px;letter-spacing:-.15px}
+  .mobile-nav-icon{font-size:17px}
+}
+
 </style>
 
 
